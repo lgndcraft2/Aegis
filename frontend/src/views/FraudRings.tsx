@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getLatestCycle } from '../api';
+import { generateEFCCDossier, generateICPCReport, downloadDossier, copyDossierToClipboard } from '../utils/efccExport';
 
 interface GraphNode {
   id: string;
@@ -21,6 +22,8 @@ export function FraudRings() {
   const [rings, setRings] = useState<Ring[]>([]);
   const [selectedRing, setSelectedRing] = useState<Ring | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'efcc' | 'icpc'>('efcc');
 
   useEffect(() => {
     const loadCycle = async () => {
@@ -76,6 +79,38 @@ export function FraudRings() {
       notation: 'compact',
       maximumFractionDigits: 1,
     }).format(amount);
+  };
+
+  const handleExportDossier = (format: 'efcc' | 'icpc') => {
+    if (!selectedRing || !cycle) return;
+
+    const enrichedRing = {
+      ...selectedRing,
+      entities: [
+        { id: 'EMP-82891', type: 'Employee', dept: 'Finance' },
+        { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.' },
+        { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster' },
+      ],
+      signals: [
+        'Account & BVN Clustering',
+        'Service Record Void',
+        'Cross-Domain Collusion',
+      ],
+    };
+
+    let dossier: string;
+    let filename: string;
+
+    if (format === 'efcc') {
+      dossier = generateEFCCDossier(enrichedRing, cycle);
+      filename = `EFCC-Dossier-${selectedRing.id}-${new Date().toISOString().split('T')[0]}.txt`;
+    } else {
+      dossier = generateICPCReport(enrichedRing, cycle);
+      filename = `ICPC-Report-${selectedRing.id}-${new Date().toISOString().split('T')[0]}.txt`;
+    }
+
+    downloadDossier(dossier, filename);
+    setShowExportModal(false);
   };
 
   if (loading) {
@@ -239,8 +274,12 @@ export function FraudRings() {
             </div>
 
             <div className="p-5 border-t border-outline-variant/20 flex gap-2">
-              <button className="flex-1 px-3 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors">
-                Investigate
+              <button 
+                onClick={() => setShowExportModal(true)}
+                className="flex-1 px-3 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                Export Dossier
               </button>
               <button className="flex-1 px-3 py-2 bg-error text-on-error rounded-lg font-label-md text-label-md hover:bg-error/90 transition-colors">
                 Escalate
@@ -376,7 +415,84 @@ export function FraudRings() {
         <div className="absolute bottom-6 right-6 opacity-30 pointer-events-none w-64 h-64 rounded-full overflow-hidden filter grayscale mix-blend-multiply hidden md:block">
           <img alt="Map outline" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeTo8aUYUE3oPnxsppC5rDHcPJ0QmFW48Zaa8fuzcKm4BUB3jmeul9guEZPfVwdrBGxECzwuitfkKAsjtW0Un8oO-SCD_y-6zuyO49jwH51L_feDLheekKdnAThCzpRtz4aaxbw6-XYH8-_mraEPOKqlb7VVuDiV1NirQLv6iPgAvwg68Tnt0JaL5AGYh5EA6tGXCyg-FeXnqhECG8wkMmTLuwjLO7qcZcTxPYI4isuEeafGA5bloxBiB-NJWUVK6pq_7yHHz0dD5K"/>
         </div>
+
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-outline-variant/20">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">security</span>
+                  Export EFCC Prosecution Dossier
+                </h2>
+                <p className="font-body-sm text-on-surface-variant mt-2">
+                  Generate a court-admissible compliance report formatted for Nigerian regulatory bodies
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <h4 className="font-label-md text-on-surface-variant uppercase mb-3 tracking-wider">
+                    Select Report Format
+                  </h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/30 cursor-pointer hover:bg-surface-container-low transition-colors" onClick={() => setExportFormat('efcc')}>
+                      <input
+                        type="radio"
+                        name="format"
+                        value="efcc"
+                        checked={exportFormat === 'efcc'}
+                        onChange={() => setExportFormat('efcc')}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-label-md text-on-surface font-semibold">EFCC Format</p>
+                        <p className="font-body-sm text-on-surface-variant">Economic & Financial Crimes Commission</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/30 cursor-pointer hover:bg-surface-container-low transition-colors" onClick={() => setExportFormat('icpc')}>
+                      <input
+                        type="radio"
+                        name="format"
+                        value="icpc"
+                        checked={exportFormat === 'icpc'}
+                        onChange={() => setExportFormat('icpc')}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-label-md text-on-surface font-semibold">ICPC Format</p>
+                        <p className="font-body-sm text-on-surface-variant">Independent Corrupt Practices Commission</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low rounded-lg p-3 border-l-4 border-l-tertiary">
+                  <p className="font-label-sm text-on-surface-variant uppercase tracking-wider mb-1">
+                    Ring {selectedRing?.id}
+                  </p>
+                  <p className="font-body-sm text-on-surface">{selectedRing?.name}</p>
+                  <p className="font-label-md text-error font-bold mt-1">{formatAmount(selectedRing?.amount || 0)}</p>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-outline-variant/20 flex gap-3">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-on-surface hover:bg-surface-container transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleExportDossier(exportFormat)}
+                  className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
-  );
-}
