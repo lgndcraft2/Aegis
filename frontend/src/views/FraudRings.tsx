@@ -1,83 +1,269 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getLatestCycle } from '../api';
+
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  score: number;
+}
+
+interface Ring {
+  id: string;
+  name: string;
+  nodeCount: number;
+  amount: number;
+  type: string;
+}
 
 export function FraudRings() {
+  const [cycle, setCycle] = useState<any>(null);
+  const [rings, setRings] = useState<Ring[]>([]);
+  const [selectedRing, setSelectedRing] = useState<Ring | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCycle = async () => {
+      try {
+        const latest = await getLatestCycle();
+        if (latest) {
+          setCycle(latest);
+          
+          // Mock rings data - in production this would come from the graph analysis
+          const mockRings: Ring[] = [
+            {
+              id: 'R-01',
+              name: 'Ghost Fleet',
+              nodeCount: 12,
+              amount: 14200000,
+              type: 'Govt Contract Fraud',
+            },
+            {
+              id: 'R-02',
+              name: 'Phantom Workforce',
+              nodeCount: 8,
+              amount: 6800000,
+              type: 'Ghost Workers',
+            },
+            {
+              id: 'R-03',
+              name: 'Invoice Splitting',
+              nodeCount: 5,
+              amount: 2400000,
+              type: 'Procurement Padding',
+            },
+          ];
+          
+          setRings(mockRings);
+          if (mockRings.length > 0) {
+            setSelectedRing(mockRings[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load cycle:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCycle();
+  }, []);
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(amount);
+  };
+
+  if (loading) {
+    return (
+      <main className="flex-1 md:ml-[220px] p-6 bg-surface-container-low min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4">
+            <span className="material-symbols-outlined text-4xl text-primary animate-spin">
+              hourglass_empty
+            </span>
+          </div>
+          <p className="font-body-md text-on-surface-variant">Loading fraud rings...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="flex-1 md:ml-[220px] bg-surface relative overflow-hidden flex flex-col">
-      {/* Top Stats Bar */}
-      <div className="h-12 bg-surface-container-lowest border-b border-outline-variant/20 flex items-center justify-center px-6 shrink-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center gap-4 font-code-md text-code-md text-on-surface-variant tracking-wide">
-          <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span> Surveillance Cycle 004</span>
+    <main className="flex-1 md:ml-[220px] bg-surface relative overflow-hidden flex flex-col min-h-screen">
+      {/* Top Status Bar */}
+      <div className="h-12 bg-surface-container-lowest border-b border-outline-variant/20 flex items-center px-6 z-10 shrink-0">
+        <div className="flex items-center gap-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            Cycle {cycle?.cycle_id?.slice(-3)} • {cycle?.status}
+          </span>
           <span className="text-outline-variant">•</span>
-          <span className="text-on-surface font-semibold">3 Rings Detected</span>
+          <span className="text-on-surface font-semibold">{rings.length} Rings Detected</span>
           <span className="text-outline-variant">•</span>
-          <span className="text-primary font-semibold">₦23.4M Intercepted</span>
+          <span className="text-primary font-semibold">
+            {formatAmount(rings.reduce((sum, r) => sum + r.amount, 0))} Intercepted
+          </span>
         </div>
       </div>
 
-      {/* Graph Canvas Container */}
-      <div className="flex-1 relative bg-surface-bright" id="graph-container">
-        {/* Simulated Graph Background Pattern */}
-        <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#1a1c1a_1px,transparent_1px)] [background-size:24px_24px]"></div>
+      {/* Main Layout */}
+      <div className="flex-1 relative flex overflow-hidden">
+        {/* Graph Canvas Background */}
+        <div className="absolute inset-0 bg-surface-bright opacity-50" />
+        <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#1a1c1a_1px,transparent_1px)] [background-size:32px_32px]"></div>
 
-        {/* Left Overlay: Detected Rings */}
-        <div className="absolute left-6 top-6 w-80 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-[0_4px_12px_rgba(0,0,0,0.08)] z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden">
-          <div className="p-4 border-b border-outline-variant/20 flex justify-between items-center bg-surface">
-            <h3 className="font-label-md text-label-md text-on-surface uppercase tracking-widest">Active Rings</h3>
-            <span className="bg-error-container text-on-error-container font-label-md text-[10px] px-2 py-0.5 rounded-full">3 Critical</span>
+        {/* Left Sidebar: Detected Rings List */}
+        <div className="absolute left-6 top-6 w-80 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-lg z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden">
+          <div className="p-4 border-b border-outline-variant/20 flex justify-between items-center">
+            <h3 className="font-label-md text-label-md text-on-surface uppercase tracking-widest">
+              Active Rings
+            </h3>
+            <span className="bg-error-container text-on-error-container font-label-md text-[10px] px-2 py-0.5 rounded-full font-semibold">
+              {rings.length} Critical
+            </span>
           </div>
-          <div className="overflow-y-auto">
-            <div className="p-4 border-b border-outline-variant/20 hover:bg-surface-container-low cursor-pointer transition-colors bg-primary-container/5">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-code-md text-code-md font-semibold text-primary">R-01</span>
-                <span className="font-label-md text-label-md text-error">₦14.2M</span>
-              </div>
-              <div className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">account_tree</span> 12 Nodes · Govt Contract Fraud
-              </div>
-            </div>
-            <div className="p-4 border-b border-outline-variant/20 hover:bg-surface-container-low cursor-pointer transition-colors">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-code-md text-code-md font-semibold text-on-surface">R-02</span>
-                <span className="font-label-md text-label-md text-error">₦6.8M</span>
-              </div>
-              <div className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">account_tree</span> 8 Nodes · Ghost Workers
-              </div>
-            </div>
-            <div className="p-4 hover:bg-surface-container-low cursor-pointer transition-colors">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-code-md text-code-md font-semibold text-on-surface">R-03</span>
-                <span className="font-label-md text-label-md text-error">₦2.4M</span>
-              </div>
-              <div className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">account_tree</span> 5 Nodes · Procurement Padding
-              </div>
-            </div>
+
+          <div className="overflow-y-auto flex-1">
+            {rings.map((ring) => (
+              <button
+                key={ring.id}
+                onClick={() => setSelectedRing(ring)}
+                className={`w-full p-4 border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors text-left ${
+                  selectedRing?.id === ring.id ? 'bg-primary-container/10 border-l-4 border-l-primary' : ''
+                }`}
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-code-md text-code-md font-semibold text-primary">
+                    {ring.id}
+                  </span>
+                  <span className="font-label-md text-label-md text-error font-bold">
+                    {formatAmount(ring.amount)}
+                  </span>
+                </div>
+                <div className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mb-1">
+                  <span className="material-symbols-outlined text-[14px]">account_tree</span>
+                  {ring.nodeCount} Nodes
+                </div>
+                <p className="font-body-sm text-body-sm text-on-surface">{ring.type}</p>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Right Overlay: Entity Profile (Simulated Active State) */}
-        <div className="absolute right-6 top-6 w-96 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-[0_4px_12px_rgba(0,0,0,0.12)] z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden hidden md:flex">
-          <div className="p-5 border-b border-outline-variant/20 relative">
-            <button className="absolute top-4 right-4 text-outline hover:text-on-surface transition-colors">
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-tertiary-container/20 border-2 border-error rounded-full flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-error" style={{fontVariationSettings: "'FILL' 1"}}>person</span>
+        {/* Right Sidebar: Entity Profile */}
+        {selectedRing && (
+          <div className="absolute right-6 top-6 w-96 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-lg z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden">
+            <div className="p-5 border-b border-outline-variant/20">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="font-headline-sm text-headline-sm text-on-surface mb-1">
+                    {selectedRing.name}
+                  </h2>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    {selectedRing.type}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-headline-sm text-headline-sm text-on-surface mb-0.5">Oluwaseun Adebayo</h2>
-                <p className="font-code-md text-code-md text-on-surface-variant">EMP-88392 · Sr. Procurement</p>
+
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-surface-container-low rounded-lg p-3">
+                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase mb-1">
+                    Nodes
+                  </p>
+                  <p className="font-headline-md text-headline-md text-on-surface">
+                    {selectedRing.nodeCount}
+                  </p>
+                </div>
+                <div className="bg-surface-container-low rounded-lg p-3">
+                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase mb-1">
+                    Amount
+                  </p>
+                  <p className="font-headline-sm text-headline-sm text-error">
+                    {formatAmount(selectedRing.amount)}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center justify-between bg-surface-container-low rounded p-3 border border-outline-variant/30">
+
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
               <div>
-                <span className="block font-label-md text-label-md text-on-surface-variant uppercase mb-1">AEGIS Score</span>
-                <span className="font-metric-xl text-metric-xl text-error leading-none">94<span className="text-headline-sm">/100</span></span>
+                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                  Connected Entities
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { id: 'EMP-82891', type: 'Employee', dept: 'Finance' },
+                    { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.' },
+                    { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster' },
+                  ].map((entity, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20"
+                    >
+                      <p className="font-code-md text-code-md text-on-surface font-semibold">
+                        {entity.id}
+                      </p>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant">
+                        {entity.type} • {entity.dept}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="text-right">
-                <span className="bg-error-container text-on-error-container font-label-md text-label-md px-2.5 py-1 rounded-full uppercase tracking-wider">High Risk</span>
+
+              <div className="border-t border-outline-variant/20 pt-4">
+                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                  Flagged Signals
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    'Account & BVN Clustering',
+                    'Service Record Void',
+                    'Cross-Domain Collusion',
+                  ].map((signal, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-body-sm text-on-surface-variant"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-error"></span>
+                      {signal}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-outline-variant/20 flex gap-2">
+              <button className="flex-1 px-3 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors">
+                Investigate
+              </button>
+              <button className="flex-1 px-3 py-2 bg-error text-on-error rounded-lg font-label-md text-label-md hover:bg-error/90 transition-colors">
+                Escalate
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Center: Graph Visualization Placeholder */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <span className="material-symbols-outlined text-6xl text-primary/20 mb-4 block">
+              account_tree
+            </span>
+            <p className="font-body-md text-on-surface-variant/40">
+              {rings.length > 0 ? 'Graph visualization with D3.js or Cytoscape.js' : 'No data'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
               </div>
             </div>
           </div>

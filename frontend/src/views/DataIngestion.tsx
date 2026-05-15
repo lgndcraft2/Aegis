@@ -1,143 +1,354 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { uploadPayroll, uploadVendors, runSurveillance, loadScenario } from '../api';
+
+interface UploadState {
+  file: File | null;
+  uploading: boolean;
+  success: boolean;
+  error: string | null;
+}
 
 export function DataIngestion() {
+  const [payroll, setPayroll] = useState<UploadState>({
+    file: null,
+    uploading: false,
+    success: false,
+    error: null,
+  });
+
+  const [vendors, setVendors] = useState<UploadState>({
+    file: null,
+    uploading: false,
+    success: false,
+    error: null,
+  });
+
+  const [running, setRunning] = useState(false);
+  const [scenarioLoading, setScenarioLoading] = useState(false);
+
+  const handlePayrollUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPayroll((prev) => ({ ...prev, file, uploading: true, error: null }));
+
+    try {
+      await uploadPayroll(file);
+      setPayroll((prev) => ({ ...prev, success: true, uploading: false }));
+    } catch (err) {
+      setPayroll((prev) => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Upload failed',
+        uploading: false,
+      }));
+    }
+  };
+
+  const handleVendorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setVendors((prev) => ({ ...prev, file, uploading: true, error: null }));
+
+    try {
+      await uploadVendors(file);
+      setVendors((prev) => ({ ...prev, success: true, uploading: false }));
+    } catch (err) {
+      setVendors((prev) => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Upload failed',
+        uploading: false,
+      }));
+    }
+  };
+
+  const handleRunSurveillance = async () => {
+    setRunning(true);
+    try {
+      const result = await runSurveillance();
+      // Cycle started, user will see it in dashboard
+      console.log('Surveillance started:', result);
+    } catch (err) {
+      console.error('Failed to run surveillance:', err);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleLoadScenario = async (n: number) => {
+    setScenarioLoading(true);
+    try {
+      await loadScenario(n);
+      // Demo data loaded
+    } catch (err) {
+      console.error('Failed to load scenario:', err);
+    } finally {
+      setScenarioLoading(false);
+    }
+  };
+
+  const canRunSurveillance = payroll.success && vendors.success;
+
   return (
-    <main className="flex-1 md:ml-[220px] p-margin-mobile md:p-margin-desktop max-w-container-max-width mx-auto w-full">
-      {/* Page Header */}
-      <header className="mb-8">
-        <h1 className="font-headline-lg text-headline-lg text-primary mb-2">Data Ingestion</h1>
-        <p className="font-body-lg text-body-lg text-on-surface-variant">Ingest records for multi-signal anomaly detection.</p>
-      </header>
+    <main className="flex-1 md:ml-[220px] p-6 bg-surface-container-low min-h-screen">
+      <div className="max-w-5xl mx-auto space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="font-headline-lg text-headline-lg text-on-background mb-2">
+            Data Ingestion
+          </h1>
+          <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">
+            Upload government payroll and vendor registers. AEGIS normalizes the data and runs multi-signal analysis across payroll, procurement, and cross-domain collusion networks.
+          </p>
+        </div>
 
-      {/* Upload Zones Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-gutter mb-8">
-        {/* Payroll CSV Upload */}
-        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col h-full">
-          <div className="p-4 border-b border-outline-variant/20 flex justify-between items-center bg-surface">
-            <h2 className="font-label-md text-label-md text-primary uppercase">Payroll CSV</h2>
-            <span className="material-symbols-outlined text-outline">description</span>
+        {/* Upload Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Payroll Upload */}
+          <div className="bg-surface rounded-lg border border-outline-variant/30 overflow-hidden flex flex-col h-full">
+            <div className="p-5 border-b border-outline-variant/20 bg-surface-container">
+              <div className="flex items-center justify-between">
+                <h2 className="font-label-md text-label-md text-on-surface uppercase tracking-wider">
+                  Payroll CSV
+                </h2>
+                <span className="material-symbols-outlined text-on-surface-variant text-[24px]">
+                  description
+                </span>
+              </div>
+            </div>
+
+            <div className="p-6 flex-1 flex flex-col">
+              {payroll.file ? (
+                <div className="mb-6 p-4 bg-surface-container-low rounded-lg border border-outline-variant/20 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-primary text-[20px]">
+                      table_chart
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body-md text-body-md text-on-surface font-semibold truncate">
+                      {payroll.file.name}
+                    </p>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      {(payroll.file.size / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                  {payroll.success && (
+                    <span className="material-symbols-outlined text-primary shrink-0">
+                      check_circle
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <label className="mb-6 p-8 border-2 border-dashed border-outline-variant/40 rounded-lg hover:border-primary hover:bg-surface-container-low transition-colors cursor-pointer flex flex-col items-center justify-center">
+                  <span className="material-symbols-outlined text-outline-variant text-[40px] mb-3">
+                    cloud_upload
+                  </span>
+                  <span className="font-body-md text-body-md text-on-surface-variant text-center">
+                    Click to upload or drag and drop
+                  </span>
+                  <span className="font-body-sm text-body-sm text-on-surface-variant text-center mt-1">
+                    CSV files only
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handlePayrollUpload}
+                    disabled={payroll.uploading}
+                    className="hidden"
+                  />
+                </label>
+              )}
+
+              <div className="flex-1 flex flex-col">
+                <h3 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                  Required Columns
+                </h3>
+                <div className="grid grid-cols-2 gap-2 font-body-sm text-body-sm bg-surface-container-low rounded-lg p-4 overflow-y-auto max-h-32">
+                  {[
+                    'employee_id',
+                    'name',
+                    'department',
+                    'grade_level',
+                    'salary_account',
+                    'bvn',
+                    'employment_date',
+                  ].map((col) => (
+                    <div
+                      key={col}
+                      className="flex items-center text-on-surface-variant"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                      {col}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {payroll.error && (
+                <div className="mt-4 p-3 bg-error/10 border border-error/30 rounded-lg">
+                  <p className="font-body-sm text-error">{payroll.error}</p>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="p-6 flex-1 flex flex-col">
-            {/* Active File State (Simulated) */}
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center p-4 bg-surface-container-low rounded-lg border border-outline-variant/50 mb-6">
-                <div className="w-10 h-10 bg-primary/10 rounded flex items-center justify-center mr-4">
-                  <span className="material-symbols-outlined text-primary text-[24px]" style={{fontVariationSettings: "'FILL' 1"}}>table_chart</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-label-md text-label-md text-on-surface truncate">Q3_Gov_Payroll_Master.csv</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">24.5 MB • 142,084 Rows</div>
-                </div>
-                <button className="text-outline hover:text-error transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
+
+          {/* Vendor Upload */}
+          <div className="bg-surface rounded-lg border border-outline-variant/30 overflow-hidden flex flex-col h-full">
+            <div className="p-5 border-b border-outline-variant/20 bg-surface-container">
+              <div className="flex items-center justify-between">
+                <h2 className="font-label-md text-label-md text-on-surface uppercase tracking-wider">
+                  Vendor Register
+                </h2>
+                <span className="material-symbols-outlined text-on-surface-variant text-[24px]">
+                  corporate_fare
+                </span>
               </div>
-              
-              <h3 className="font-label-md text-label-md text-on-surface-variant uppercase mb-3">Schema Validation</h3>
-              <div className="grid grid-cols-2 gap-2 font-code-md text-code-md bg-surface-bright border border-outline-variant/20 rounded p-3 h-[180px] overflow-y-auto">
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>employee_id</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>first_name</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>last_name</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>ssn_hash</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>department_code</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>base_salary</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>bank_routing_num</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>bank_account_num</div>
-                <div className="flex items-center text-on-surface-variant opacity-70"><span className="w-2 h-2 rounded-full bg-outline mr-2"></span>bonus_amount</div>
-                <div className="flex items-center text-on-surface-variant opacity-70"><span className="w-2 h-2 rounded-full bg-outline mr-2"></span>tax_deductions</div>
+            </div>
+
+            <div className="p-6 flex-1 flex flex-col">
+              {vendors.file ? (
+                <div className="mb-6 p-4 bg-surface-container-low rounded-lg border border-outline-variant/20 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-primary text-[20px]">
+                      table_chart
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body-md text-body-md text-on-surface font-semibold truncate">
+                      {vendors.file.name}
+                    </p>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      {(vendors.file.size / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                  {vendors.success && (
+                    <span className="material-symbols-outlined text-primary shrink-0">
+                      check_circle
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <label className="mb-6 p-8 border-2 border-dashed border-outline-variant/40 rounded-lg hover:border-primary hover:bg-surface-container-low transition-colors cursor-pointer flex flex-col items-center justify-center">
+                  <span className="material-symbols-outlined text-outline-variant text-[40px] mb-3">
+                    cloud_upload
+                  </span>
+                  <span className="font-body-md text-body-md text-on-surface-variant text-center">
+                    Click to upload or drag and drop
+                  </span>
+                  <span className="font-body-sm text-body-sm text-on-surface-variant text-center mt-1">
+                    CSV files only
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleVendorUpload}
+                    disabled={vendors.uploading}
+                    className="hidden"
+                  />
+                </label>
+              )}
+
+              <div className="flex-1 flex flex-col">
+                <h3 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                  Required Columns
+                </h3>
+                <div className="grid grid-cols-2 gap-2 font-body-sm text-body-sm bg-surface-container-low rounded-lg p-4 overflow-y-auto max-h-32">
+                  {[
+                    'vendor_id',
+                    'name',
+                    'registration_address',
+                    'director_name',
+                    'settlement_account',
+                    'bvn',
+                    'registration_date',
+                  ].map((col) => (
+                    <div
+                      key={col}
+                      className="flex items-center text-on-surface-variant"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                      {col}
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {vendors.error && (
+                <div className="mt-4 p-3 bg-error/10 border border-error/30 rounded-lg">
+                  <p className="font-body-sm text-error">{vendors.error}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Vendor Register Upload */}
-        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col h-full">
-          <div className="p-4 border-b border-outline-variant/20 flex justify-between items-center bg-surface">
-            <h2 className="font-label-md text-label-md text-primary uppercase">Vendor Register</h2>
-            <span className="material-symbols-outlined text-outline">corporate_fare</span>
-          </div>
-          <div className="p-6 flex-1 flex flex-col">
-            {/* Active File State (Simulated) */}
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center p-4 bg-surface-container-low rounded-lg border border-outline-variant/50 mb-6">
-                <div className="w-10 h-10 bg-primary/10 rounded flex items-center justify-center mr-4">
-                  <span className="material-symbols-outlined text-primary text-[24px]" style={{fontVariationSettings: "'FILL' 1"}}>table_chart</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-label-md text-label-md text-on-surface truncate">Approved_Vendors_FY24.csv</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">8.2 MB • 45,902 Rows</div>
-                </div>
-                <button className="text-outline hover:text-error transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-              
-              <h3 className="font-label-md text-label-md text-on-surface-variant uppercase mb-3">Schema Validation</h3>
-              <div className="grid grid-cols-2 gap-2 font-code-md text-code-md bg-surface-bright border border-outline-variant/20 rounded p-3 h-[180px] overflow-y-auto">
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>vendor_id</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>legal_name</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>ein_tax_id</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>incorporation_date</div>
-                <div className="flex items-center text-error"><span className="w-2 h-2 rounded-full bg-error mr-2"></span>primary_address (Missing)</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>bank_routing_num</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>bank_account_num</div>
-                <div className="flex items-center text-on-surface"><span className="w-2 h-2 rounded-full bg-primary mr-2"></span>contact_email</div>
-                <div className="flex items-center text-on-surface-variant opacity-70"><span className="w-2 h-2 rounded-full bg-outline mr-2"></span>contract_value</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Primary CTA */}
-      <div className="mb-12">
-        <button className="w-full bg-primary text-on-primary font-headline-sm text-headline-sm py-4 rounded-lg shadow-sm hover:bg-primary/90 transition-colors flex items-center justify-center space-x-3 group">
-          <span className="material-symbols-outlined group-hover:rotate-180 transition-transform duration-500">sync</span>
-          <span>Initiate Surveillance Cycle</span>
+        {/* CTA: Run Surveillance */}
+        <button
+          onClick={handleRunSurveillance}
+          disabled={!canRunSurveillance || running}
+          className={`w-full py-4 rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 transition-all ${
+            canRunSurveillance && !running
+              ? 'bg-primary text-on-primary hover:bg-primary/90 shadow-md'
+              : 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60'
+          }`}
+        >
+          <span className={`material-symbols-outlined ${running ? 'animate-spin' : ''}`}>
+            {running ? 'hourglass_empty' : 'play_arrow'}
+          </span>
+          {running ? 'Running Surveillance...' : 'Initiate Surveillance Cycle'}
         </button>
-      </div>
 
-      {/* Demo Scenarios Panel */}
-      <section className="border-t border-outline-variant/20 pt-8">
-        <header className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="font-headline-sm text-headline-sm text-primary">Demo Scenarios</h2>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">Load pre-seeded datasets for demonstration purposes.</p>
-          </div>
-          <span className="material-symbols-outlined text-outline">science</span>
-        </header>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-          {/* Scenario 1 */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-5 cursor-pointer hover:border-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-all group">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-label-md text-label-md text-primary uppercase">The Ghost Fleet</h3>
-              <span className="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">directions_boat</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">Simulates a complex network of phantom employees routing payments to shell vendor accounts.</p>
-            <div className="font-code-md text-[11px] text-outline">12 Anomalies • 3 Signals</div>
-          </div>
-          
-          {/* Scenario 2 */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-5 cursor-pointer hover:border-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-all group">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-label-md text-label-md text-primary uppercase">Clean Slate</h3>
-              <span className="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">check_circle</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">A baseline dataset with zero intentional anomalies to demonstrate false-positive suppression.</p>
-            <div className="font-code-md text-[11px] text-outline">0 Anomalies • Baseline</div>
-          </div>
-          
-          {/* Scenario 3 */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-5 cursor-pointer hover:border-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-all group">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-label-md text-label-md text-primary uppercase">Deep Network</h3>
-              <span className="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[20px]">account_tree</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">High-volume dataset revealing subtle multi-tier relationships between disparate vendor entities.</p>
-            <div className="font-code-md text-[11px] text-outline">45 Anomalies • 8 Signals</div>
+        {/* Demo Scenarios */}
+        <div className="border-t border-outline-variant/20 pt-8">
+          <h2 className="font-headline-sm text-headline-sm text-on-background mb-2">
+            Demo Scenarios
+          </h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-6">
+            Load pre-seeded datasets to see AEGIS in action.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                id: 1,
+                name: 'Ghost Fleet',
+                description: 'Phantom employees + shell vendor collusion',
+                details: '12 Anomalies • 3 Signals',
+              },
+              {
+                id: 2,
+                name: 'Clean Slate',
+                description: 'Baseline dataset with zero anomalies',
+                details: '0 Anomalies • Baseline',
+              },
+              {
+                id: 3,
+                name: 'Deep Network',
+                description: 'Complex multi-tier relationships',
+                details: '45 Anomalies • 8 Signals',
+              },
+            ].map((scenario) => (
+              <button
+                key={scenario.id}
+                onClick={() => handleLoadScenario(scenario.id)}
+                disabled={scenarioLoading}
+                className="p-5 bg-surface rounded-lg border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+              >
+                <h3 className="font-label-md text-label-md text-on-background font-semibold mb-1">
+                  {scenario.name}
+                </h3>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mb-3">
+                  {scenario.description}
+                </p>
+                <p className="font-code-sm text-code-sm text-on-surface-variant">
+                  {scenario.details}
+                </p>
+              </button>
+            ))}
           </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

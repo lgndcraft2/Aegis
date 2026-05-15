@@ -627,3 +627,73 @@ async def load_scenario(n: int, db: Session = Depends(get_db)):
         "employees": len(employees),
         "vendors": len(vendors),
     }
+
+
+# ──────────────────────────────────────────────
+#  Data Retrieval Endpoints
+# ──────────────────────────────────────────────
+
+@router.get("/alerts/{cycle_id}")
+async def get_alerts(cycle_id: str, db: Session = Depends(get_db)):
+    """Retrieve all fraud alerts for a cycle."""
+    alerts = db.query(FraudAlert).filter(FraudAlert.cycle_id == cycle_id).all()
+    return {
+        "cycle_id": cycle_id,
+        "alerts": [
+            {
+                "cycle_id": alert.cycle_id,
+                "entity_type": alert.entity_type,
+                "entity_id": alert.entity_id,
+                "signal_name": alert.signal_name,
+                "description": alert.description,
+                "severity": alert.severity,
+            }
+            for alert in alerts
+        ],
+    }
+
+
+@router.get("/employees")
+async def get_employees(db: Session = Depends(get_db)):
+    """Retrieve all employees in the database."""
+    employees = db.query(Employee).all()
+    return {
+        "employees": [
+            {
+                "employee_id": emp.employee_id,
+                "name": emp.name,
+                "department": emp.department,
+                "grade_level": emp.grade_level,
+                "salary_account": emp.salary_account,
+                "bvn": emp.bvn,
+                "employment_date": emp.employment_date.isoformat() if emp.employment_date else None,
+                "has_service_record": emp.has_service_record,
+                "absences_ytd": emp.absences_ytd or 0,
+                "score": emp.score,
+                "verdict": emp.verdict,
+            }
+            for emp in employees
+        ],
+    }
+
+
+@router.get("/vendors")
+async def get_vendors(db: Session = Depends(get_db)):
+    """Retrieve all vendors in the database."""
+    vendors = db.query(Vendor).all()
+    return {
+        "vendors": [
+            {
+                "vendor_id": vnd.vendor_id,
+                "name": vnd.name,
+                "registration_address": vnd.registration_address,
+                "director_name": vnd.director_name,
+                "settlement_account": vnd.settlement_account,
+                "bvn": vnd.bvn,
+                "registration_date": vnd.registration_date.isoformat() if vnd.registration_date else None,
+                "score": vnd.score,
+                "verdict": vnd.verdict,
+            }
+            for vnd in vendors
+        ],
+    }
