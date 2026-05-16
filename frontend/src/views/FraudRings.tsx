@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CytoscapeComponent from 'react-cytoscapejs';
 import { getLatestCycle } from '../api';
 import { generateEFCCDossier, generateICPCReport, downloadDossier, copyDossierToClipboard } from '../utils/efccExport';
 
@@ -24,6 +25,9 @@ export function FraudRings() {
   const [loading, setLoading] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'efcc' | 'icpc'>('efcc');
+  const [cyRef, setCyRef] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
 
   useEffect(() => {
     const loadCycle = async () => {
@@ -150,7 +154,7 @@ export function FraudRings() {
       <div className="flex-1 relative flex overflow-hidden">
         {/* Graph Canvas Background */}
         <div className="absolute inset-0 bg-surface-bright opacity-50" />
-        <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#1a1c1a_1px,transparent_1px)] [background-size:32px_32px]"></div>
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808033_1px,transparent_1px),linear-gradient(to_bottom,#80808033_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
         {/* Left Sidebar: Detected Rings List */}
         <div className="absolute left-6 top-6 w-80 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-lg z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden">
@@ -167,7 +171,7 @@ export function FraudRings() {
             {rings.map((ring) => (
               <button
                 key={ring.id}
-                onClick={() => setSelectedRing(ring)}
+                onClick={() => { setSelectedRing(ring); setIsRightPanelOpen(true); }}
                 className={`w-full p-4 border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors text-left ${
                   selectedRing?.id === ring.id ? 'bg-primary-container/10 border-l-4 border-l-primary' : ''
                 }`}
@@ -192,18 +196,36 @@ export function FraudRings() {
 
         {/* Right Sidebar: Entity Profile */}
         {selectedRing && (
-          <div className="absolute right-6 top-6 w-96 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-lg z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden">
-            <div className="p-5 border-b border-outline-variant/20">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface mb-1">
-                    {selectedRing.name}
-                  </h2>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    {selectedRing.type}
-                  </p>
+          <>
+            {/* Toggle Button */}
+            <button
+              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+              className={`absolute top-6 transition-all duration-300 ${
+                isRightPanelOpen ? 'right-[408px]' : 'right-6'
+              } z-30 bg-surface-container-lowest p-2 rounded-l-lg border border-r-0 border-outline-variant/20 shadow-lg text-on-surface hover:bg-surface-container-low`}
+            >
+              <span className="material-symbols-outlined">
+                {isRightPanelOpen ? 'chevron_right' : 'chevron_left'}
+              </span>
+            </button>
+
+            {/* Sidebar Content */}
+            <div
+              className={`absolute right-6 top-6 w-96 bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-lg z-20 flex flex-col max-h-[calc(100%-48px)] overflow-hidden transition-transform duration-300 ${
+                isRightPanelOpen ? 'translate-x-0' : 'translate-x-[calc(100%+24px)]'
+              }`}
+            >
+              <div className="p-5 border-b border-outline-variant/20">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface mb-1">
+                      {selectedRing.name}
+                    </h2>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      {selectedRing.type}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div className="bg-surface-container-low rounded-lg p-3">
@@ -286,72 +308,111 @@ export function FraudRings() {
               </button>
             </div>
           </div>
+          </>
         )}
 
         {/* Center: Graph Visualization Placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center">
-            <span className="material-symbols-outlined text-6xl text-primary/20 mb-4 block">
-              account_tree
-            </span>
-            <p className="font-body-md text-on-surface-variant/40">
-              {rings.length > 0 ? 'Graph visualization with D3.js or Cytoscape.js' : 'No data'}
-            </p>
+        {rings.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-6xl text-primary/20 mb-4 block">
+                account_tree
+              </span>
+              <p className="font-body-md text-on-surface-variant/40">
+                No data
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         {/* Simulated Cytoscape Canvas Elements (Static representation) */}
         
         {rings.length > 0 && (
           <>
-        {/* Orchestrator Node */}
-        <div className="absolute top-[40%] left-[45%] w-16 h-16 rounded-full border-[3px] border-error bg-error-container flex items-center justify-center z-10 shadow-[0_0_15px_rgba(186,26,26,0.3)] animate-pulse">
-          <span className="material-symbols-outlined text-error text-2xl">person</span>
-          <div className="absolute -bottom-8 w-32 text-center">
-            <span className="font-code-md text-code-md text-on-surface bg-surface/80 px-1 rounded">Oluwaseun A.</span>
+            <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2 bg-surface p-2 rounded-lg shadow-lg border border-outline-variant/30">
+              <button onClick={() => cyRef?.zoom(cyRef.zoom() * 1.2)} className="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded transition-colors text-on-surface">
+                <span className="material-symbols-outlined text-[20px]">zoom_in</span>
+              </button>
+              <button onClick={() => cyRef?.zoom(cyRef.zoom() * 0.8)} className="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded transition-colors text-on-surface">
+                <span className="material-symbols-outlined text-[20px]">zoom_out</span>
+              </button>
+              <button onClick={() => cyRef?.fit()} className="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded transition-colors text-on-surface">
+                <span className="material-symbols-outlined text-[20px]">fit_screen</span>
+              </button>
+            </div>
+            <div className="absolute inset-0 z-10">
+              <CytoscapeComponent
+                cy={(cy) => {
+                  setCyRef(cy);
+                  cy.removeAllListeners('tap');
+                  cy.on('tap', 'node', (evt) => {
+                    setSelectedNode(evt.target.data());
+                  });
+                  cy.on('tap', (evt) => {
+                    if (evt.target === cy) {
+                      setSelectedNode(null);
+                    }
+                  });
+                }}
+              elements={[
+                { data: { id: 'orchestrator', label: selectedRing?.name || 'Oluwaseun A.', type: 'Person' }, position: { x: 300, y: 300 } },
+                { data: { id: 'emp', label: 'EMP-82891', type: 'Employee' }, position: { x: 200, y: 200 } },
+                { data: { id: 'vnd', label: 'VND-45021', type: 'Vendor' }, position: { x: 400, y: 150 } },
+                { data: { id: 'acc', label: 'ACC-920811', type: 'Account' }, position: { x: 250, y: 400 } },
+                { data: { source: 'orchestrator', target: 'vnd' } },
+                { data: { source: 'orchestrator', target: 'acc' } },
+                { data: { source: 'orchestrator', target: 'emp' } },
+                { data: { source: 'emp', target: 'acc' } }
+              ]}
+              stylesheet={[
+                { selector: 'node', style: { 'background-color': '#4a6358', 'label': 'data(label)', 'color': '#ffffff', 'text-outline-color': '#1a1c19', 'text-outline-width': 2, 'text-valign': 'bottom', 'text-halign': 'center', 'font-size': '12px', 'text-margin-y': 4 } },
+                { selector: 'node[type="Person"]', style: { 'background-color': '#ba1a1a', 'border-width': 3, 'border-color': '#ffb4ab', 'width': 45, 'height': 45 } },
+                { selector: 'node[type="Vendor"]', style: { 'background-color': '#1f2a24', 'shape': 'hexagon', 'width': 35, 'height': 35 } },
+                { selector: 'node[type="Account"]', style: { 'background-color': '#1f2a24', 'shape': 'diamond', 'width': 30, 'height': 30 } },
+                { selector: 'edge', style: { 'width': 2, 'line-color': '#707971', 'target-arrow-color': '#707971', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
+              ]}
+              style={{ width: '100%', height: '100%' }}
+              layout={{ name: 'preset' }}
+            />
           </div>
-        </div>
-
-        {/* Vendor Node (Hexagon) */}
-        <div className="absolute top-[25%] left-[55%] w-12 h-12 bg-surface border-2 border-outline-variant flex items-center justify-center z-10" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
-          <span className="material-symbols-outlined text-secondary text-lg">storefront</span>
-          <div className="absolute -bottom-6 w-24 text-center">
-            <span className="font-code-md text-[11px] text-on-surface-variant bg-surface/80 px-1 rounded">Apex Build</span>
-          </div>
-        </div>
-
-        {/* Bank Account Node (Diamond) */}
-        <div className="absolute top-[55%] left-[35%] w-10 h-10 rotate-45 bg-surface border-2 border-outline-variant flex items-center justify-center z-10">
-          <span className="material-symbols-outlined text-secondary text-base -rotate-45">account_balance</span>
-          <div className="absolute -bottom-8 -right-8 w-24 text-center rotate-0">
-            <span className="font-code-md text-[11px] text-on-surface-variant bg-surface/80 px-1 rounded">GTB-83</span>
-          </div>
-        </div>
-
-        {/* Employee Node (Circle) */}
-        <div className="absolute top-[30%] left-[30%] w-10 h-10 rounded-full bg-surface border-2 border-outline flex items-center justify-center z-10">
-          <span className="material-symbols-outlined text-outline text-base">person_outline</span>
-          <div className="absolute -bottom-6 w-24 text-center">
-            <span className="font-code-md text-[11px] text-on-surface-variant bg-surface/80 px-1 rounded">EMP-112</span>
-          </div>
-        </div>
-
-        {/* Edges (SVG lines) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
-          {/* Orchestrator to Vendor */}
-          <line opacity="0.6" stroke="#ba1a1a" strokeDasharray="4" strokeWidth="2" x1="45%" x2="55%" y1="40%" y2="25%"></line>
-          {/* Orchestrator to Bank */}
-          <line opacity="0.8" stroke="#ba1a1a" strokeWidth="2" x1="45%" x2="35%" y1="40%" y2="55%"></line>
-          {/* Orchestrator to Employee */}
-          <line opacity="0.5" stroke="#707971" strokeWidth="1.5" x1="45%" x2="30%" y1="40%" y2="30%"></line>
-          {/* Employee to Bank */}
-          <line opacity="0.4" stroke="#707971" strokeWidth="1" x1="30%" x2="35%" y1="30%" y2="55%"></line>
-        </svg>
-
-        {/* Map Context Hint (Bottom Right) */}
-        <div className="absolute bottom-6 right-6 opacity-30 pointer-events-none w-64 h-64 rounded-full overflow-hidden filter grayscale mix-blend-multiply hidden md:block">
-          <img alt="Map outline" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeTo8aUYUE3oPnxsppC5rDHcPJ0QmFW48Zaa8fuzcKm4BUB3jmeul9guEZPfVwdrBGxECzwuitfkKAsjtW0Un8oO-SCD_y-6zuyO49jwH51L_feDLheekKdnAThCzpRtz4aaxbw6-XYH8-_mraEPOKqlb7VVuDiV1NirQLv6iPgAvwg68Tnt0JaL5AGYh5EA6tGXCyg-FeXnqhECG8wkMmTLuwjLO7qcZcTxPYI4isuEeafGA5bloxBiB-NJWUVK6pq_7yHHz0dD5K"/>
-        </div>
-          </>\n        )}\n
+          {selectedNode && (
+            <div className="absolute top-6 right-6 z-20 bg-surface-container-low p-4 rounded-lg shadow-lg border border-outline-variant/30 w-64 pointer-events-auto">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-headline-sm text-on-surface">{selectedNode.label}</h3>
+                <button onClick={() => setSelectedNode(null)} className="text-on-surface-variant hover:text-on-surface">
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+              <div className="font-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                {selectedNode.type}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Entity ID</span>
+                  <span className="font-code-md text-on-surface bg-surface px-2 py-1 rounded border border-outline-variant/20">{selectedNode.id}</span>
+                </div>
+                {selectedNode.type === 'Person' && (
+                  <div>
+                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Role</span>
+                    <span className="font-body-sm text-error font-semibold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">warning</span>
+                      Orchestrator
+                    </span>
+                  </div>
+                )}
+                {selectedNode.type === 'Account' && (
+                  <div>
+                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Status</span>
+                    <span className="font-body-sm text-warning font-semibold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">lock</span>
+                      Flagged for Freeze
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          </>
+        )}
         {/* Export Modal */}
         {showExportModal && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

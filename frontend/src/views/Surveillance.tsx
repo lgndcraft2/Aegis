@@ -16,6 +16,7 @@ export function Surveillance() {
   const [cycle, setCycle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'critical' | 'high' | 'hold' | 'review'>('all');
+  const [selectedReport, setSelectedReport] = useState<AlertRow | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -268,7 +269,7 @@ export function Surveillance() {
                       </div>
 
                       <div className="flex gap-3">
-                        <button className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors">
+                        <button onClick={() => setSelectedReport(alert)} className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors">
                           Review Details
                         </button>
                         <button className="flex-1 px-4 py-2 bg-error text-on-error rounded-lg font-label-md text-label-md hover:bg-error/90 transition-colors">
@@ -313,6 +314,58 @@ export function Surveillance() {
           </div>
         )}
       </div>
+
+      {/* Report Details Modal */}
+      {selectedReport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-outline-variant/20 flex justify-between items-center bg-surface shrink-0">
+              <h2 className="font-headline-sm text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">analytics</span>
+                Anomaly Report: {selectedReport.entity_id}
+              </h2>
+              <button onClick={() => setSelectedReport(null)} className="text-on-surface-variant hover:text-on-surface">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="flex items-center gap-4">
+                <span className={`px-3 py-1 rounded-full font-label-sm font-semibold ${getSeverityBg(selectedReport.severity)}`}>
+                  {selectedReport.severity} RISK
+                </span>
+                <span className="font-label-md text-on-surface-variant uppercase">{selectedReport.entity_type}</span>
+              </div>
+              <div>
+                <h3 className="font-label-md text-on-surface-variant uppercase mb-2">Primary Signal Detected</h3>
+                <p className="font-body-lg text-on-surface">{selectedReport.signal_name}</p>
+              </div>
+              <div className="bg-surface-container-low rounded-lg p-4 border-l-4 border-l-warning">
+                <h3 className="font-label-md text-on-surface-variant uppercase mb-2">Detailed Analysis</h3>
+                <p className="font-body-md text-on-surface">{selectedReport.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-outline-variant/20">
+                <div>
+                  <h4 className="font-label-sm text-on-surface-variant uppercase mb-1">Timestamp</h4>
+                  <p className="font-code-md text-on-surface">{new Date().toLocaleString()}</p>
+                </div>
+                <div>
+                  <h4 className="font-label-sm text-on-surface-variant uppercase mb-1">AEGIS Confidence</h4>
+                  <p className="font-code-md text-on-surface">94.2%</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-outline-variant/20 flex gap-3 bg-surface shrink-0">
+              <button onClick={() => setSelectedReport(null)} className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-on-surface hover:bg-surface-container transition-colors">
+                Close Report
+              </button>
+              <button className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">gavel</span>
+                Take Action
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
