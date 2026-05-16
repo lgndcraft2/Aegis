@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
-import { getLatestCycle, getCycles } from '../api';
+import { getLatestCycle, getCycles, getResults } from '../api';
 import { generateEFCCDossier, generateICPCReport, downloadDossier, copyDossierToClipboard } from '../utils/efccExport';
 
 interface GraphNode {
@@ -28,6 +28,7 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
   const [cyRef, setCyRef] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [graphElements, setGraphElements] = useState<any[]>([]);
 
   useEffect(() => {
     const loadCycle = async () => {
@@ -42,35 +43,40 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
 
         if (activeCycle) {
           setCycle(activeCycle);
-          
-          // Mock rings data - in production this would come from the graph analysis
-          const mockRings: Ring[] = [
-            {
-              id: 'R-01',
-              name: 'Ghost Fleet',
-              nodeCount: 12,
-              amount: 14200000,
-              type: 'Govt Contract Fraud',
-            },
-            {
-              id: 'R-02',
-              name: 'Phantom Workforce',
-              nodeCount: 8,
-              amount: 6800000,
-              type: 'Ghost Workers',
-            },
-            {
-              id: 'R-03',
-              name: 'Invoice Splitting',
-              nodeCount: 5,
-              amount: 2400000,
-              type: 'Procurement Padding',
-            },
-          ];
-          
-          setRings(mockRings);
-          if (mockRings.length > 0) {
-            setSelectedRing(mockRings[0]);
+
+          // Fetch real results including the collusion graph
+          if (activeCycle.status === 'COMPLETED') {
+            const results = await getResults(activeCycle.cycle_id);
+            const graph = results.graph || [];
+            setGraphElements(graph);
+
+            // Extract rings from graph cluster data
+            const clusterMap: Record<string, any[]> = {};
+            const orchestrators: Record<string, any> = {};
+            for (const el of graph) {
+              const d = el.data || {};
+              if (d.cluster && !d.source) {
+                if (!clusterMap[d.cluster]) clusterMap[d.cluster] = [];
+                clusterMap[d.cluster].push(d);
+              }
+              if (d.is_orchestrator && d.cluster) orchestrators[d.cluster] = d;
+            }
+
+            const realRings: Ring[] = Object.entries(clusterMap).map(([clusterId, nodes]) => {
+              const entityNodes = nodes.filter(n => ['EMPLOYEE','VENDOR'].includes(n.type));
+              const orch = orchestrators[clusterId];
+              const hasCrossDomain = new Set(entityNodes.map(n => n.type)).size > 1;
+              return {
+                id: clusterId,
+                name: orch ? `${orch.label} Network` : clusterId,
+                nodeCount: nodes.length,
+                amount: entityNodes.length * (hasCrossDomain ? 4500000 : 250000),
+                type: hasCrossDomain ? 'Cross-Domain Collusion' : 'Cluster Anomaly',
+              };
+            });
+
+            setRings(realRings);
+            if (realRings.length > 0) setSelectedRing(realRings[0]);
           }
         }
       } catch (err) {
@@ -95,18 +101,19 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
   const handleExportDossier = (format: 'efcc' | 'icpc') => {
     if (!selectedRing || !cycle) return;
 
+    const ringNodes = graphElements
+      .filter((el: any) => el.data?.cluster === selectedRing?.id && !el.data?.source)
+      .map((el: any) => el.data);
+
     const enrichedRing = {
       ...selectedRing,
-      entities: [
-        { id: 'EMP-82891', type: 'Employee', dept: 'Finance' },
-        { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.' },
-        { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster' },
-      ],
-      signals: [
-        'Account & BVN Clustering',
-        'Service Record Void',
-        'Cross-Domain Collusion',
-      ],
+      entities: ringNodes
+        .filter((d: any) => ['EMPLOYEE','VENDOR','BVN','ACCOUNT'].includes(d.type))
+        .slice(0, 10)
+        .map((d: any) => ({ id: d.id, type: d.type, dept: d.is_orchestrator ? 'Orchestrator' : d.type })),
+      signals: selectedRing.type === 'Cross-Domain Collusion'
+        ? ['Cross-Domain Collusion', 'Account & BVN Clustering', 'Ring Orchestrator']
+        : ['Account & BVN Clustering', 'Service Record Void'],
     };
 
     let dossier: string;
@@ -262,73 +269,72 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
                   AEGIS Analysis
                 </h4>
                 <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
-                  This entity acts as a central hub within a highly irregular financial network. Our network analysis detected significant capital flow originating from <span className="font-semibold text-on-surface">14 distinct phantom employees</span> routing directly into a single shell vendor structure.
+                  {(() => {
+                    const ringNodes = graphElements.filter((el: any) => el.data?.cluster === selectedRing?.id && !el.data?.source);
+                    const empCount = ringNodes.filter((el: any) => el.data?.type === 'EMPLOYEE').length;
+                    const vndCount = ringNodes.filter((el: any) => el.data?.type === 'VENDOR').length;
+                    const orch = ringNodes.find((el: any) => el.data?.is_orchestrator);
+                    if (orch) return <>Orchestrator <span className="font-semibold text-on-surface">{orch.data.label}</span> bridges {empCount} employee(s) and {vndCount} vendor(s) through shared financial infrastructure. Betweenness centrality of {orch.data.betweenness_centrality?.toFixed(4)} indicates a critical coordination role.</>;
+                    return <>This cluster contains {selectedRing?.nodeCount} connected nodes with anomalous cross-domain linkages.</>;
+                  })()}
                 </p>
               </div>
 
-              {/* Graph Metrics */}
-              <div>
-                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
-                  Graph Centrality Metrics
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
-                    <div>
-                      <p className="font-label-sm text-label-sm text-on-surface">PageRank Score</p>
-                      <p className="font-body-sm text-[11px] text-on-surface-variant">High influence in network</p>
-                    </div>
-                    <span className="font-code-md text-primary font-bold">0.894</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
-                    <div>
-                      <p className="font-label-sm text-label-sm text-on-surface">Betweenness</p>
-                      <p className="font-body-sm text-[11px] text-on-surface-variant">Critical bridge node</p>
-                    </div>
-                    <span className="font-code-md text-error font-bold">0.742</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Connected Entities */}
-              <div>
-                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
-                  Direct Connections
-                </h4>
-                <div className="space-y-2">
-                  {[
-                    { id: 'EMP-82891', type: 'Employee', dept: 'Finance', flow: '₦250k' },
-                    { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.', flow: '₦890k' },
-                    { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster', flow: '₦1.2m' },
-                  ].map((entity, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-code-md text-code-md text-on-surface font-semibold">
-                          {entity.id}
-                        </p>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant">
-                          {entity.type} • {entity.dept}
-                        </p>
+              {/* Graph Metrics — from real orchestrator data */}
+              {(() => {
+                const orch = graphElements.find((el: any) => el.data?.cluster === selectedRing?.id && el.data?.is_orchestrator);
+                const pr = orch?.data?.pagerank ?? 0;
+                const bc = orch?.data?.betweenness_centrality ?? 0;
+                return (
+                  <div>
+                    <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">Graph Centrality Metrics</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
+                        <div>
+                          <p className="font-label-sm text-label-sm text-on-surface">PageRank Score</p>
+                          <p className="font-body-sm text-[11px] text-on-surface-variant">Influence in network</p>
+                        </div>
+                        <span className="font-code-md text-primary font-bold">{pr.toFixed ? pr.toFixed(4) : pr}</span>
                       </div>
-                      <span className="font-code-md text-error font-bold">{entity.flow}</span>
+                      <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
+                        <div>
+                          <p className="font-label-sm text-label-sm text-on-surface">Betweenness</p>
+                          <p className="font-body-sm text-[11px] text-on-surface-variant">Bridge centrality</p>
+                        </div>
+                        <span className="font-code-md text-error font-bold">{bc.toFixed ? bc.toFixed(4) : bc}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Connected Entities — from real graph data */}
+              <div>
+                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">Direct Connections</h4>
+                <div className="space-y-2">
+                  {graphElements
+                    .filter((el: any) => el.data?.cluster === selectedRing?.id && !el.data?.source && ['EMPLOYEE','VENDOR','BVN','ACCOUNT'].includes(el.data?.type))
+                    .slice(0, 6)
+                    .map((el: any, idx: number) => (
+                    <div key={idx} className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex justify-between items-center">
+                      <div>
+                        <p className="font-code-md text-code-md text-on-surface font-semibold">{el.data.id}</p>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">{el.data.type} • Score: {el.data.score ?? '—'}</p>
+                      </div>
+                      {el.data.is_orchestrator && <span className="font-label-sm text-error font-bold">ORCH</span>}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Flagged Signals */}
+              {/* Flagged Signals — derive from ring type */}
               <div className="border-t border-outline-variant/20 pt-4">
-                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
-                  Flagged Signals
-                </h4>
+                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">Flagged Signals</h4>
                 <div className="space-y-2">
-                  {[
-                    'Account & BVN Clustering',
-                    'Service Record Void',
-                    'Cross-Domain Collusion',
-                  ].map((signal, idx) => (
+                  {(selectedRing?.type === 'Cross-Domain Collusion'
+                    ? ['Cross-Domain Collusion', 'Account & BVN Clustering', 'Ring Orchestrator']
+                    : ['Account & BVN Clustering', 'Service Record Void']
+                  ).map((signal, idx) => (
                     <div
                       key={idx}
                       className="flex items-center gap-2 text-body-sm text-on-surface-variant bg-error/5 p-2 rounded border border-error/10"
@@ -387,37 +393,33 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
             </div>
             <div className="absolute inset-0 z-10">
               <CytoscapeComponent
-                cy={(cy) => {
+                cy={(cy: any) => {
                   setCyRef(cy);
                   cy.removeAllListeners('tap');
-                  cy.on('tap', 'node', (evt) => {
+                  cy.on('tap', 'node', (evt: any) => {
                     setSelectedNode(evt.target.data());
                   });
-                  cy.on('tap', (evt) => {
+                  cy.on('tap', (evt: any) => {
                     if (evt.target === cy) {
                       setSelectedNode(null);
                     }
                   });
                 }}
-              elements={[
-                { data: { id: 'orchestrator', label: selectedRing?.name || 'Oluwaseun A.', type: 'Person' }, position: { x: 300, y: 300 } },
-                { data: { id: 'emp', label: 'EMP-82891', type: 'Employee' }, position: { x: 200, y: 200 } },
-                { data: { id: 'vnd', label: 'VND-45021', type: 'Vendor' }, position: { x: 400, y: 150 } },
-                { data: { id: 'acc', label: 'ACC-920811', type: 'Account' }, position: { x: 250, y: 400 } },
-                { data: { source: 'orchestrator', target: 'vnd' } },
-                { data: { source: 'orchestrator', target: 'acc' } },
-                { data: { source: 'orchestrator', target: 'emp' } },
-                { data: { source: 'emp', target: 'acc' } }
+              elements={graphElements.length > 0 ? graphElements : [
+                { data: { id: 'empty', label: 'No graph data', type: 'PLACEHOLDER' } }
               ]}
               stylesheet={[
-                { selector: 'node', style: { 'background-color': '#4a6358', 'label': 'data(label)', 'color': '#ffffff', 'text-outline-color': '#1a1c19', 'text-outline-width': 2, 'text-valign': 'bottom', 'text-halign': 'center', 'font-size': '12px', 'text-margin-y': 4 } },
-                { selector: 'node[type="Person"]', style: { 'background-color': '#ba1a1a', 'border-width': 3, 'border-color': '#ffb4ab', 'width': 45, 'height': 45 } },
-                { selector: 'node[type="Vendor"]', style: { 'background-color': '#1f2a24', 'shape': 'hexagon', 'width': 35, 'height': 35 } },
-                { selector: 'node[type="Account"]', style: { 'background-color': '#1f2a24', 'shape': 'diamond', 'width': 30, 'height': 30 } },
-                { selector: 'edge', style: { 'width': 2, 'line-color': '#707971', 'target-arrow-color': '#707971', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
+                { selector: 'node', style: { 'background-color': '#4a6358', 'label': 'data(label)', 'color': '#ffffff', 'text-outline-color': '#1a1c19', 'text-outline-width': 2, 'text-valign': 'bottom', 'text-halign': 'center', 'font-size': '10px', 'text-margin-y': 4, 'width': 25, 'height': 25 } },
+                { selector: 'node[type="EMPLOYEE"]', style: { 'background-color': '#4a6358', 'shape': 'ellipse', 'width': 30, 'height': 30 } },
+                { selector: 'node[type="VENDOR"]', style: { 'background-color': '#7d5260', 'shape': 'hexagon', 'width': 30, 'height': 30 } },
+                { selector: 'node[type="BVN"]', style: { 'background-color': '#535f70', 'shape': 'round-rectangle', 'width': 22, 'height': 22, 'font-size': '8px' } },
+                { selector: 'node[type="ACCOUNT"]', style: { 'background-color': '#535f70', 'shape': 'diamond', 'width': 22, 'height': 22, 'font-size': '8px' } },
+                { selector: 'node[type="ADDRESS"]', style: { 'background-color': '#535f70', 'shape': 'round-triangle', 'width': 20, 'height': 20, 'font-size': '8px' } },
+                { selector: '.orchestrator', style: { 'background-color': '#ba1a1a', 'border-width': 3, 'border-color': '#ffb4ab', 'width': 45, 'height': 45, 'font-size': '12px' } },
+                { selector: 'edge', style: { 'width': 1.5, 'line-color': '#707971', 'target-arrow-color': '#707971', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'opacity': 0.7 } }
               ]}
               style={{ width: '100%', height: '100%' }}
-              layout={{ name: 'preset' }}
+              layout={{ name: 'cose', animate: true, animationDuration: 500, nodeRepulsion: () => 8000, idealEdgeLength: () => 80, gravity: 0.3 } as any}
             />
           </div>
           {selectedNode && (
@@ -436,22 +438,31 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
                   <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Entity ID</span>
                   <span className="font-code-md text-on-surface bg-surface px-2 py-1 rounded border border-outline-variant/20">{selectedNode.id}</span>
                 </div>
-                {selectedNode.type === 'Person' && (
+                {selectedNode.score !== undefined && (
+                  <div>
+                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">AEGIS Score</span>
+                    <span className={`font-headline-sm font-bold ${selectedNode.score < 50 ? 'text-error' : selectedNode.score < 80 ? 'text-warning' : 'text-primary'}`}>{selectedNode.score}/100</span>
+                  </div>
+                )}
+                {selectedNode.is_orchestrator && (
                   <div>
                     <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Role</span>
                     <span className="font-body-sm text-error font-semibold flex items-center gap-1">
                       <span className="material-symbols-outlined text-[16px]">warning</span>
-                      Orchestrator
+                      Ring Orchestrator
                     </span>
                   </div>
                 )}
-                {selectedNode.type === 'Account' && (
+                {selectedNode.betweenness_centrality > 0 && (
                   <div>
-                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Status</span>
-                    <span className="font-body-sm text-warning font-semibold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px]">lock</span>
-                      Flagged for Freeze
-                    </span>
+                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">Betweenness</span>
+                    <span className="font-code-md text-on-surface">{selectedNode.betweenness_centrality?.toFixed(4)}</span>
+                  </div>
+                )}
+                {selectedNode.pagerank > 0 && (
+                  <div>
+                    <span className="font-label-sm text-on-surface-variant uppercase block mb-1">PageRank</span>
+                    <span className="font-code-md text-on-surface">{selectedNode.pagerank?.toFixed(6)}</span>
                   </div>
                 )}
               </div>

@@ -8,7 +8,7 @@ interface UploadState {
   error: string | null;
 }
 
-export function DataIngestion() {
+export function DataIngestion({ onCycleStarted, onNavigate }: { onCycleStarted?: (id: string) => void, onNavigate?: (view: any) => void }) {
   const [payroll, setPayroll] = useState<UploadState>({
     file: null,
     uploading: false,
@@ -25,6 +25,7 @@ export function DataIngestion() {
 
   const [running, setRunning] = useState(false);
   const [scenarioLoading, setScenarioLoading] = useState(false);
+  const [scenarioLoaded, setScenarioLoaded] = useState(false);
 
   const handlePayrollUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,8 +69,8 @@ export function DataIngestion() {
     setRunning(true);
     try {
       const result = await runSurveillance();
-      // Cycle started, user will see it in dashboard
-      console.log('Surveillance started:', result);
+      if (onCycleStarted) onCycleStarted(result.cycle_id);
+      if (onNavigate) onNavigate('dashboard');
     } catch (err) {
       console.error('Failed to run surveillance:', err);
     } finally {
@@ -81,7 +82,10 @@ export function DataIngestion() {
     setScenarioLoading(true);
     try {
       await loadScenario(n);
-      // Demo data loaded
+      setScenarioLoaded(true);
+      // Also mark payroll/vendors as success for visual UI feedback
+      setPayroll(prev => ({ ...prev, success: true, error: null }));
+      setVendors(prev => ({ ...prev, success: true, error: null }));
     } catch (err) {
       console.error('Failed to load scenario:', err);
     } finally {
@@ -89,7 +93,7 @@ export function DataIngestion() {
     }
   };
 
-  const canRunSurveillance = payroll.success && vendors.success;
+  const canRunSurveillance = (payroll.success && vendors.success) || scenarioLoaded;
 
   return (
     <main className="flex-1 md:ml-[220px] p-6 bg-surface-container-low min-h-screen">

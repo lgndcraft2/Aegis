@@ -32,7 +32,12 @@ export default function App() {
     <MainLayout activeView={activeView} setActiveView={setActiveView} selectedCycleId={selectedCycleId}>
       {activeView === 'dashboard' && <Dashboard selectedCycleId={selectedCycleId} />}
       {activeView === 'runs' && <AuditRuns onSelectCycle={(id) => { setSelectedCycleId(id); setActiveView('dashboard'); }} />}
-      {activeView === 'ingest' && <DataIngestion />}
+      {activeView === 'ingest' && (
+        <DataIngestion 
+          onCycleStarted={(id) => setSelectedCycleId(id)} 
+          onNavigate={(view) => setActiveView(view)} 
+        />
+      )}
       {activeView === 'scores' && <Surveillance selectedCycleId={selectedCycleId} onNavigate={setActiveView} />}
       {activeView === 'graph' && <FraudRings selectedCycleId={selectedCycleId} />}
       {activeView === 'squad' && <SquadInterception selectedCycleId={selectedCycleId} />}

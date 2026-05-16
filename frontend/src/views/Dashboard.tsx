@@ -21,6 +21,7 @@ export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null
   const [loadingScenario, setLoadingScenario] = useState(false);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     const loadCycle = async () => {
       try {
         let activeCycle = null;
@@ -36,11 +37,10 @@ export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null
           
           // Subscribe to real-time updates if running
           if (activeCycle.status === 'RUNNING') {
-            const unsubscribe = subscribeToStream(activeCycle.cycle_id, (message) => {
+            unsubscribe = subscribeToStream(activeCycle.cycle_id, (message) => {
               setStreamMessage(message.stage || message.message || '');
               if (message.progress) setProgress(message.progress);
             });
-            return unsubscribe;
           }
         }
       } catch (err) {
@@ -50,9 +50,9 @@ export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null
       }
     };
 
-    const unsubscribe = loadCycle();
+    loadCycle();
     return () => {
-      if (unsubscribe instanceof Function) unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, [selectedCycleId]);
 

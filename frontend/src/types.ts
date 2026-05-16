@@ -43,6 +43,13 @@ export interface GraphElement {
     score?: number
     source?: string
     target?: string
+    cluster?: string
+    is_orchestrator?: boolean
+    degree_centrality?: number
+    betweenness_centrality?: number
+    pagerank?: number
+    eigenvector_centrality?: number
+    [key: string]: any
   }
   classes?: string
 }
