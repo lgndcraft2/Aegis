@@ -15,7 +15,7 @@ export default function App() {
     <MainLayout activeView={activeView} setActiveView={setActiveView}>
       {activeView === 'dashboard' && <Dashboard />}
       {activeView === 'ingest' && <DataIngestion />}
-      {activeView === 'scores' && <Surveillance />}
+      {activeView === 'scores' && <Surveillance onNavigate={setActiveView} />}
       {activeView === 'graph' && <FraudRings />}
       {activeView === 'squad' && <SquadInterception />}
     </MainLayout>

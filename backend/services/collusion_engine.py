@@ -94,9 +94,11 @@ def generate_collusion_graph(employees_df: pd.DataFrame, vendors_df: pd.DataFram
     #  Phase 3 — Centrality Analysis (amplification layer)
     # ══════════════════════════════════════════════
 
+    print(f"\n[AEGIS GRAPH] Computing Degree and Betweenness Centrality for {len(G.nodes())} nodes...")
     degree_cent = nx.degree_centrality(G)
     betweenness_cent = nx.betweenness_centrality(G)
 
+    print(f"[AEGIS GRAPH] Computing PageRank (max_iter=100)...")
     try:
         pagerank = nx.pagerank(G, max_iter=100)
     except nx.PowerIterationFailedConvergence:
@@ -117,6 +119,7 @@ def generate_collusion_graph(employees_df: pd.DataFrame, vendors_df: pd.DataFram
     #  Phase 4 — Connected-Component Cluster Analysis
     # ══════════════════════════════════════════════
 
+    print(f"[AEGIS GRAPH] Finding connected components to identify fraud rings...")
     components = list(nx.connected_components(G))
     suspicious_clusters = []
 

@@ -74,9 +74,13 @@ def analyze_payroll(employees_df: pd.DataFrame, cycle_id: str):
     features = ['absences_ytd', 'grade_num']
     # If there are enough rows, run Isolation Forest
     if len(df) > 10:
+        print(f"\n[AEGIS ML] Running IsolationForest on {len(df)} employees...")
         iso = IsolationForest(contamination=0.05, random_state=42)
         df['if_anomaly'] = iso.fit_predict(df[features])
         
+        anomalies_found = len(df[df['if_anomaly'] == -1])
+        print(f"[AEGIS ML] IsolationForest complete! Identified {anomalies_found} statistical outliers.\n")
+
         for idx, row in df[df['if_anomaly'] == -1].iterrows():
             df.at[idx, 'score'] -= 15
             alerts.append({

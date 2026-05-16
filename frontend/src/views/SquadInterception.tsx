@@ -22,39 +22,20 @@ export function SquadInterception() {
         if (latest) {
           setCycle(latest);
           
-          // Mock transactions - in production this would come from Squad API
-          const mockTransactions: Transaction[] = [
-            {
-              entity_id: 'Global Logistics Corp',
-              amount: 1245000,
-              va_number: 'VA-9081-4432-11',
-              status: 'HELD',
-              timestamp: '2024-05-15T14:32:00Z',
-            },
-            {
-              entity_id: 'EMP-82891 (Phantom)',
-              amount: 250000,
-              va_number: 'VA-7234-8899-02',
-              status: 'HELD',
-              timestamp: '2024-05-15T14:28:00Z',
-            },
-            {
-              entity_id: 'Prime Supplies Ltd',
-              amount: 890000,
-              va_number: 'VA-5521-3344-09',
-              status: 'HELD',
-              timestamp: '2024-05-15T14:25:00Z',
-            },
-            {
-              entity_id: 'Verified Vendor (Inc.)',
-              amount: 450000,
-              va_number: 'VA-8890-1122-05',
-              status: 'RELEASED',
-              timestamp: '2024-05-15T13:45:00Z',
-            },
-          ];
+          const squadData = await getSquadAccounts(latest.cycle_id);
           
-          setTransactions(mockTransactions);
+          if (squadData && squadData.held_accounts) {
+            const realTransactions: Transaction[] = squadData.held_accounts.map((acc: any) => ({
+              entity_id: acc.squad_ref || acc.transaction_id,
+              amount: acc.amount,
+              va_number: acc.va_number,
+              status: 'HELD',
+              timestamp: latest.started_at || new Date().toISOString(),
+            }));
+            setTransactions(realTransactions);
+          } else {
+            setTransactions([]);
+          }
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -65,6 +46,12 @@ export function SquadInterception() {
 
     loadData();
   }, []);
+
+  const handleRelease = (index: number) => {
+    const updated = [...transactions];
+    updated[index].status = 'RELEASED';
+    setTransactions(updated);
+  };
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -112,7 +99,7 @@ export function SquadInterception() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h1 className="font-headline-lg text-headline-lg text-on-background mb-2">
-              Squad Payment Interception
+              Treasury Payment Interception
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant">
               Real-time disbursement control through Squad Virtual Accounts.
@@ -297,7 +284,10 @@ export function SquadInterception() {
                           <div className="mt-4 flex gap-2">
                             {tx.status === 'HELD' && (
                               <>
-                                <button className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors">
+                                <button 
+                                  onClick={() => handleRelease(index)}
+                                  className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors"
+                                >
                                   Clear & Release
                                 </button>
                                 <button className="flex-1 px-4 py-2 bg-error text-on-error rounded-lg font-label-md text-label-md hover:bg-error/90 transition-colors">

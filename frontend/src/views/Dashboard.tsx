@@ -212,56 +212,7 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Demo Scenarios */}
-        <div className="border-t border-outline-variant/20 pt-8">
-          <h2 className="font-headline-sm text-headline-sm text-on-background mb-4">
-            Demo Scenarios
-          </h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mb-6">
-            Load pre-seeded datasets to see AEGIS in action.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                id: 1,
-                name: 'Ghost Fleet',
-                desc: 'Phantom employees + shell vendors',
-                icon: 'directions_boat',
-              },
-              {
-                id: 2,
-                name: 'Clean Slate',
-                desc: 'Baseline dataset, zero anomalies',
-                icon: 'check_circle',
-              },
-              {
-                id: 3,
-                name: 'Deep Network',
-                desc: 'Complex multi-tier relationships',
-                icon: 'account_tree',
-              },
-            ].map((scenario) => (
-              <button
-                key={scenario.id}
-                onClick={() => handleLoadScenario(scenario.id)}
-                disabled={loadingScenario}
-                className="p-4 bg-surface border border-outline-variant/30 rounded-lg hover:border-primary hover:bg-surface-container transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-label-md text-label-md text-on-background font-semibold">
-                    {scenario.name}
-                  </h3>
-                  <span className="material-symbols-outlined text-on-surface-variant">
-                    {scenario.icon}
-                  </span>
-                </div>
-                <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  {scenario.desc}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
+
       </div>
     </main>
   );

@@ -11,7 +11,7 @@ interface AlertRow {
   expanded: boolean;
 }
 
-export function Surveillance() {
+export function Surveillance({ onNavigate }: { onNavigate?: (view: any) => void }) {
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [cycle, setCycle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -358,7 +358,7 @@ export function Surveillance() {
               <button onClick={() => setSelectedReport(null)} className="flex-1 px-4 py-2 bg-surface border border-outline-variant rounded-lg font-label-md text-on-surface hover:bg-surface-container transition-colors">
                 Close Report
               </button>
-              <button className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+              <button onClick={() => { if (onNavigate) onNavigate('squad'); }} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">gavel</span>
                 Take Action
               </button>

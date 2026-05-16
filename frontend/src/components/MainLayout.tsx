@@ -14,7 +14,7 @@ export function MainLayout({ activeView, setActiveView, children }: MainLayoutPr
     { id: 'ingest', label: 'Upload', icon: 'upload_file' },
     { id: 'scores', label: 'Surveillance', icon: 'security' },
     { id: 'graph', label: 'Fraud Rings', icon: 'hub' },
-    { id: 'squad', label: 'Squad', icon: 'payments' },
+    { id: 'squad', label: 'Treasury', icon: 'account_balance_wallet' },
   ];
 
   return (

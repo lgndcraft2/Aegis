@@ -102,8 +102,11 @@ class SquadClient:
             "mobile_num": mobile_num,
             "bvn": bvn,
         }
-        if beneficiary_account:
-            payload["beneficiary_account"] = beneficiary_account
+        
+        # Use provided account, or fallback to environment variable
+        beneficiary = beneficiary_account or os.getenv("SQUAD_BENEFICIARY_ACCOUNT")
+        if beneficiary:
+            payload["beneficiary_account"] = beneficiary
 
         try:
             resp = requests.post(
@@ -157,7 +160,7 @@ class SquadClient:
         payload = {
             "transaction_reference": tx_ref,
             "amount": str(amount_kobo),
-            "bank_code": bank_code,
+            "bank_code": bank_code.zfill(6),
             "account_number": account_number,
             "account_name": account_name,
             "currency_id": "NGN",
@@ -200,7 +203,7 @@ class SquadClient:
             }
 
         payload = {
-            "bank_code": bank_code,
+            "bank_code": bank_code.zfill(6),
             "account_number": account_number,
         }
 
@@ -245,6 +248,34 @@ class SquadClient:
             return resp.json()
         except Exception as e:
             logger.error(f"Squad requery failed: {e}")
+            return {"success": False, "message": str(e), "data": {}}
+
+    # ──────────────────────────────────────────────
+    #  Merchant — Wallet Balance
+    # ──────────────────────────────────────────────
+
+    def get_wallet_balance(self, currency_id: str = "NGN") -> dict:
+        """
+        Get merchant wallet balance.
+        
+        GET /merchant/balance
+        """
+        if not self.configured:
+            return {
+                "success": True,
+                "simulated": True,
+                "data": {"balance": "0.00", "currency_id": currency_id},
+            }
+
+        try:
+            resp = requests.get(
+                f"{self.base_url}/merchant/balance?currency_id={currency_id}",
+                headers=self._headers,
+                timeout=30,
+            )
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Squad balance lookup failed: {e}")
             return {"success": False, "message": str(e), "data": {}}
 
     # ──────────────────────────────────────────────
