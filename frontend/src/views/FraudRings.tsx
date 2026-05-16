@@ -27,7 +27,7 @@ export function FraudRings() {
   const [exportFormat, setExportFormat] = useState<'efcc' | 'icpc'>('efcc');
   const [cyRef, setCyRef] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
 
   useEffect(() => {
     const loadCycle = async () => {
@@ -328,7 +328,7 @@ export function FraudRings() {
         
         {rings.length > 0 && (
           <>
-            <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2 bg-surface p-2 rounded-lg shadow-lg border border-outline-variant/30">
+            <div className="fixed bottom-6 right-6 z-20 flex flex-col gap-2 bg-surface p-2 rounded-lg shadow-lg border border-outline-variant/30">
               <button onClick={() => cyRef?.zoom(cyRef.zoom() * 1.2)} className="w-8 h-8 flex items-center justify-center hover:bg-surface-container rounded transition-colors text-on-surface">
                 <span className="material-symbols-outlined text-[20px]">zoom_in</span>
               </button>
