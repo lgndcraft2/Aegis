@@ -299,74 +299,10 @@ export function FraudRings() {
             </p>
           </div>
         </div>
-      </div>
-    </main>
-  );
-}
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-5 overflow-y-auto space-y-6">
-            {/* Entity Metadata */}
-            <div>
-              <h4 className="font-label-md text-label-md text-on-surface-variant uppercase border-b border-outline-variant/20 pb-2 mb-3">Entity Details</h4>
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">Ministry</span>
-                  <span className="font-body-sm text-body-sm text-on-surface col-span-2">Works &amp; Housing</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">Level</span>
-                  <span className="font-body-sm text-body-sm text-on-surface col-span-2">Directorate (GL-15)</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">Known Aliases</span>
-                  <span className="font-body-sm text-body-sm text-on-surface col-span-2">O.A. Ventures (Proxy)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Connections Snippet */}
-            <div>
-              <h4 className="font-label-md text-label-md text-on-surface-variant uppercase border-b border-outline-variant/20 pb-2 mb-3">Direct Connections (Ring R-01)</h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 p-2 rounded bg-surface-container-low border border-outline-variant/20">
-                  <div className="w-6 h-6 rotate-45 bg-surface border border-outline-variant flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[14px] -rotate-45 text-secondary">account_balance</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-code-md text-[11px] truncate text-on-surface">GTBank · 0129****83</p>
-                  </div>
-                  <span className="font-label-md text-[10px] text-error font-bold">₦4.2M</span>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded bg-surface-container-low border border-outline-variant/20">
-                  <div className="w-6 h-6 hexagon bg-surface border border-outline-variant flex items-center justify-center shrink-0" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
-                    <span className="material-symbols-outlined text-[14px] text-secondary">storefront</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-code-md text-[11px] truncate text-on-surface">Apex Build Ltd</p>
-                  </div>
-                  <span className="font-label-md text-[10px] text-error font-bold">₦10.0M</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Actions Footer */}
-          <div className="p-5 border-t border-outline-variant/20 bg-surface mt-auto flex gap-3">
-            <button className="flex-1 bg-surface border border-outline text-on-surface font-label-md text-label-md py-2 rounded-lg hover:bg-surface-container-low transition-colors">
-              Export Report
-            </button>
-            <button className="flex-1 bg-tertiary-container text-on-tertiary-container font-label-md text-label-md py-2 rounded-lg hover:bg-tertiary hover:text-on-tertiary transition-colors flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-[18px]">gavel</span>
-              Squad Hold
-            </button>
-          </div>
-        </div>
-
         {/* Simulated Cytoscape Canvas Elements (Static representation) */}
         
+        {rings.length > 0 && (
+          <>
         {/* Orchestrator Node */}
         <div className="absolute top-[40%] left-[45%] w-16 h-16 rounded-full border-[3px] border-error bg-error-container flex items-center justify-center z-10 shadow-[0_0_15px_rgba(186,26,26,0.3)] animate-pulse">
           <span className="material-symbols-outlined text-error text-2xl">person</span>
@@ -415,7 +351,7 @@ export function FraudRings() {
         <div className="absolute bottom-6 right-6 opacity-30 pointer-events-none w-64 h-64 rounded-full overflow-hidden filter grayscale mix-blend-multiply hidden md:block">
           <img alt="Map outline" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeTo8aUYUE3oPnxsppC5rDHcPJ0QmFW48Zaa8fuzcKm4BUB3jmeul9guEZPfVwdrBGxECzwuitfkKAsjtW0Un8oO-SCD_y-6zuyO49jwH51L_feDLheekKdnAThCzpRtz4aaxbw6-XYH8-_mraEPOKqlb7VVuDiV1NirQLv6iPgAvwg68Tnt0JaL5AGYh5EA6tGXCyg-FeXnqhECG8wkMmTLuwjLO7qcZcTxPYI4isuEeafGA5bloxBiB-NJWUVK6pq_7yHHz0dD5K"/>
         </div>
-
+          </>\n        )}\n
         {/* Export Modal */}
         {showExportModal && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -496,3 +432,5 @@ export function FraudRings() {
         )}
       </div>
     </main>
+  );
+}
