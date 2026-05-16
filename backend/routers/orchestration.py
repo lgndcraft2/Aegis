@@ -7,17 +7,19 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Depends, Query
+from fastapi.responses import Response
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from backend.database import get_db, SessionLocal
 from backend.models import Employee, Vendor, SurveillanceCycle, FraudAlert, Transaction
-from backend.services.synthetic_data import generate_synthetic_data
+from backend.services.synthetic_data import generate_synthetic_data, generate_edge_case_data
 from backend.services.payroll_engine import analyze_payroll
 from backend.services.procurement_engine import analyze_procurement
 from backend.services.collusion_engine import generate_collusion_graph
 from backend.services.squad_client import squad_client
 from backend.services.audit import log_event
+from backend.services.pdf_report import generate_cycle_pdf
 from backend.ws_manager import manager
 
 logger = logging.getLogger("aegis.orchestration")
@@ -579,13 +581,16 @@ async def load_scenario(n: int, db: Session = Depends(get_db)):
         # "Ghost Fleet" — full dataset with all 3 fraud rings
         scenario_name = "The Ghost Fleet"
     elif n == 2:
-        # "Clean Slate" — remove fraud rings, only clean data
-        employees = [e for e in employees if not str(e["employee_id"]).startswith("EMP_FR")]
-        vendors = [v for v in vendors if not str(v["vendor_id"]).startswith("VND_FR")]
-        scenario_name = "Clean Slate (no fraud)"
+        # "Edge Cases" — clean data + false-positive archetypes, no fraud rings
+        employees, vendors, fp_explanations = generate_edge_case_data()
+        scenario_name = "Edge Cases (false positive test)"
     else:
-        # "Deep Network" — extra fraud ring connections
-        scenario_name = "Deep Network (amplified fraud)"
+        # "Deep Network" — full fraud rings + false-positive archetypes mixed in
+        from backend.services.synthetic_data import generate_false_positive_entities
+        fp_emps, fp_vnds, _ = generate_false_positive_entities()
+        employees.extend(fp_emps)
+        vendors.extend(fp_vnds)
+        scenario_name = "Deep Network (fraud + edge cases)"
 
     # Persist to DB
     for emp in employees:
@@ -627,6 +632,77 @@ async def load_scenario(n: int, db: Session = Depends(get_db)):
         "employees": len(employees),
         "vendors": len(vendors),
     }
+
+
+# ──────────────────────────────────────────────
+#  PDF Report Export
+# ──────────────────────────────────────────────
+
+@router.get("/report/{cycle_id}")
+async def download_report(cycle_id: str, db: Session = Depends(get_db)):
+    """
+    Generate and download an EFCC-formatted PDF surveillance report for a cycle.
+    Returns application/pdf with Content-Disposition attachment header.
+    """
+    cycle = db.query(SurveillanceCycle).filter(SurveillanceCycle.cycle_id == cycle_id).first()
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+
+    if cycle.status != "COMPLETED":
+        raise HTTPException(status_code=400, detail=f"Cycle is {cycle.status}, not COMPLETED")
+
+    employees = json.loads(cycle.result_employees) if cycle.result_employees else []
+    vendors = json.loads(cycle.result_vendors) if cycle.result_vendors else []
+    summary = json.loads(cycle.result_summary) if cycle.result_summary else {}
+    graph_data = json.loads(cycle.result_graph) if cycle.result_graph else []
+
+    # Extract cluster info from graph data for the report
+    clusters = []
+    seen_orchestrators = set()
+    for el in graph_data:
+        d = el.get("data", {})
+        if d.get("is_orchestrator") and d.get("id") not in seen_orchestrators:
+            seen_orchestrators.add(d["id"])
+            clusters.append({
+                "cluster_id": d.get("cluster", "RING_?"),
+                "entity_count": "—",
+                "is_cross_domain": True,
+                "orchestrator": d.get("id", "N/A"),
+                "orchestrator_betweenness": d.get("betweenness_centrality", 0),
+            })
+
+    # Fetch alerts from DB
+    alerts_db = db.query(FraudAlert).filter(FraudAlert.cycle_id == cycle_id).all()
+    alert_dicts = [
+        {
+            "entity_id": a.entity_id,
+            "entity_type": a.entity_type,
+            "severity": a.severity,
+            "signal_name": a.signal_name,
+            "description": a.description,
+        }
+        for a in alerts_db
+    ]
+
+    pdf_bytes = generate_cycle_pdf(
+        cycle_id=cycle_id,
+        status=cycle.status,
+        source=cycle.source or "N/A",
+        started_at=cycle.started_at.isoformat() if cycle.started_at else None,
+        completed_at=cycle.completed_at.isoformat() if cycle.completed_at else None,
+        employees=employees,
+        vendors=vendors,
+        alerts=alert_dicts,
+        summary=summary,
+        graph_clusters=clusters,
+    )
+
+    filename = f"AEGIS_Report_{cycle_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ──────────────────────────────────────────────
