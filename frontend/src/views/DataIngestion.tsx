@@ -35,10 +35,11 @@ export function DataIngestion() {
     try {
       await uploadPayroll(file);
       setPayroll((prev) => ({ ...prev, success: true, uploading: false }));
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Upload failed';
       setPayroll((prev) => ({
         ...prev,
-        error: err instanceof Error ? err.message : 'Upload failed',
+        error: msg,
         uploading: false,
       }));
     }
@@ -53,10 +54,11 @@ export function DataIngestion() {
     try {
       await uploadVendors(file);
       setVendors((prev) => ({ ...prev, success: true, uploading: false }));
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Upload failed';
       setVendors((prev) => ({
         ...prev,
-        error: err instanceof Error ? err.message : 'Upload failed',
+        error: msg,
         uploading: false,
       }));
     }

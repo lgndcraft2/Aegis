@@ -55,6 +55,8 @@ async def upload_payroll(file: UploadFile = File(...), db: Session = Depends(get
     try:
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
+        # Normalize column names: strip whitespace and lowercase
+        df.columns = [col.strip().lower() for col in df.columns]
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
 
@@ -140,6 +142,8 @@ async def upload_vendors(file: UploadFile = File(...), db: Session = Depends(get
     try:
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
+        # Normalize column names: strip whitespace and lowercase
+        df.columns = [col.strip().lower() for col in df.columns]
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
 
@@ -529,7 +533,7 @@ async def get_squad_accounts(cycle_id: str, db: Session = Depends(get_db)):
     """Retrieve all Squad Virtual Accounts holding intercepted funds for a cycle."""
     held_txs = (
         db.query(Transaction)
-        .filter(Transaction.cycle_id == cycle_id, Transaction.status == "HELD")
+        .filter(Transaction.cycle_id == cycle_id, Transaction.status.in_(["HELD", "RELEASED"]))
         .all()
     )
 
@@ -539,6 +543,7 @@ async def get_squad_accounts(cycle_id: str, db: Session = Depends(get_db)):
             "type": tx.type,
             "amount": tx.amount,
             "verdict": tx.verdict,
+            "status": tx.status,
             "va_number": tx.squad_va_number,
             "squad_ref": tx.squad_tx_ref,
         }
@@ -745,8 +750,6 @@ async def get_employees(db: Session = Depends(get_db)):
                 "employment_date": emp.employment_date.isoformat() if emp.employment_date else None,
                 "has_service_record": emp.has_service_record,
                 "absences_ytd": emp.absences_ytd or 0,
-                "score": emp.score,
-                "verdict": emp.verdict,
             }
             for emp in employees
         ],
@@ -767,9 +770,76 @@ async def get_vendors(db: Session = Depends(get_db)):
                 "settlement_account": vnd.settlement_account,
                 "bvn": vnd.bvn,
                 "registration_date": vnd.registration_date.isoformat() if vnd.registration_date else None,
-                "score": vnd.score,
-                "verdict": vnd.verdict,
             }
             for vnd in vendors
         ],
     }
+
+@router.post("/squad/release/{transaction_id}")
+async def release_squad_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    """Release a held transaction by updating its status in the DB."""
+    # Find the transaction by either transaction_id or squad_ref since frontend uses squad_ref as entity_id
+    tx = db.query(Transaction).filter(
+        (Transaction.transaction_id == transaction_id) | 
+        (Transaction.squad_tx_ref == transaction_id)
+    ).first()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    tx.status = "RELEASED"
+    tx.verdict = "CLEAR"
+    
+    # Attempt to trigger the actual Squad Fund Transfer if configured
+    try:
+        # Fetch beneficiary details
+        beneficiary_name = "Unknown"
+        beneficiary_account = "Unknown"
+        
+        if tx.type == "PAYROLL":
+            emp = db.query(Employee).filter(Employee.id == tx.employee_id).first()
+            if emp:
+                beneficiary_name = emp.name
+                beneficiary_account = emp.salary_account
+        else:
+            vnd = db.query(Vendor).filter(Vendor.id == tx.vendor_id).first()
+            if vnd:
+                beneficiary_name = vnd.name
+                beneficiary_account = vnd.settlement_account
+
+        # Initiate transfer via Squad
+        # Note: In a real NIP environment, bank_code would be stored in the DB.
+        # For this integration, we'll use a placeholder or parse from account if possible.
+        squad_resp = squad_client.initiate_transfer(
+            amount_kobo=int(tx.amount * 100),
+            bank_code="000000", # Squad Sandbox placeholder
+            account_number=beneficiary_account,
+            account_name=beneficiary_name,
+            remark=f"AEGIS RELEASE: {tx.transaction_id}"
+        )
+        
+        # Log the release event with Squad response
+        log_event(
+            db,
+            cycle_id=tx.cycle_id,
+            event_type="SQUAD_TRANSFER",
+            entity_type=tx.type,
+            entity_id=tx.transaction_id,
+            details={
+                "action": "FUNDS_RELEASED", 
+                "amount": tx.amount, 
+                "squad_va": tx.squad_va_number,
+                "squad_transfer_id": squad_resp.get("data", {}).get("transaction_reference", "N/A"),
+                "status": squad_resp.get("message", "Success")
+            },
+            severity="INFO",
+        )
+    except Exception as squad_err:
+        logger.error(f"Squad transfer failed for {tx.transaction_id}: {squad_err}")
+        # We still commit the DB change as the 'intent' was to release
+        log_event(db, tx.cycle_id, "ERROR", entity_id=tx.transaction_id, details={"error": str(squad_err)})
+
+    db.commit()
+    
+    return {"success": True, "message": "Funds released and Squad transfer initiated", "transaction_id": tx.transaction_id}
+

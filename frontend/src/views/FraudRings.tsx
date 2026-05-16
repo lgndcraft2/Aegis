@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
-import { getLatestCycle } from '../api';
+import { getLatestCycle, getCycles } from '../api';
 import { generateEFCCDossier, generateICPCReport, downloadDossier, copyDossierToClipboard } from '../utils/efccExport';
 
 interface GraphNode {
@@ -18,7 +18,7 @@ interface Ring {
   type: string;
 }
 
-export function FraudRings() {
+export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | null }) {
   const [cycle, setCycle] = useState<any>(null);
   const [rings, setRings] = useState<Ring[]>([]);
   const [selectedRing, setSelectedRing] = useState<Ring | null>(null);
@@ -32,9 +32,16 @@ export function FraudRings() {
   useEffect(() => {
     const loadCycle = async () => {
       try {
-        const latest = await getLatestCycle();
-        if (latest) {
-          setCycle(latest);
+        let activeCycle = null;
+        if (selectedCycleId) {
+          const cycles = await getCycles();
+          activeCycle = cycles.find((c: any) => c.cycle_id === selectedCycleId);
+        } else {
+          activeCycle = await getLatestCycle();
+        }
+
+        if (activeCycle) {
+          setCycle(activeCycle);
           
           // Mock rings data - in production this would come from the graph analysis
           const mockRings: Ring[] = [
@@ -74,7 +81,7 @@ export function FraudRings() {
     };
 
     loadCycle();
-  }, []);
+  }, [selectedCycleId]);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -247,32 +254,71 @@ export function FraudRings() {
               </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+            <div className="overflow-y-auto flex-1 p-5 space-y-6">
+              {/* Plain English Summary */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <h4 className="font-label-sm text-label-sm text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">psychology</span>
+                  AEGIS Analysis
+                </h4>
+                <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                  This entity acts as a central hub within a highly irregular financial network. Our network analysis detected significant capital flow originating from <span className="font-semibold text-on-surface">14 distinct phantom employees</span> routing directly into a single shell vendor structure.
+                </p>
+              </div>
+
+              {/* Graph Metrics */}
               <div>
                 <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
-                  Connected Entities
+                  Graph Centrality Metrics
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
+                    <div>
+                      <p className="font-label-sm text-label-sm text-on-surface">PageRank Score</p>
+                      <p className="font-body-sm text-[11px] text-on-surface-variant">High influence in network</p>
+                    </div>
+                    <span className="font-code-md text-primary font-bold">0.894</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
+                    <div>
+                      <p className="font-label-sm text-label-sm text-on-surface">Betweenness</p>
+                      <p className="font-body-sm text-[11px] text-on-surface-variant">Critical bridge node</p>
+                    </div>
+                    <span className="font-code-md text-error font-bold">0.742</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Connected Entities */}
+              <div>
+                <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
+                  Direct Connections
                 </h4>
                 <div className="space-y-2">
                   {[
-                    { id: 'EMP-82891', type: 'Employee', dept: 'Finance' },
-                    { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.' },
-                    { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster' },
+                    { id: 'EMP-82891', type: 'Employee', dept: 'Finance', flow: '₦250k' },
+                    { id: 'VND-45021', type: 'Vendor', dept: 'Shell Co.', flow: '₦890k' },
+                    { id: 'ACC-920811', type: 'Account', dept: 'BVN Cluster', flow: '₦1.2m' },
                   ].map((entity, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20"
+                      className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex justify-between items-center"
                     >
-                      <p className="font-code-md text-code-md text-on-surface font-semibold">
-                        {entity.id}
-                      </p>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        {entity.type} • {entity.dept}
-                      </p>
+                      <div>
+                        <p className="font-code-md text-code-md text-on-surface font-semibold">
+                          {entity.id}
+                        </p>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          {entity.type} • {entity.dept}
+                        </p>
+                      </div>
+                      <span className="font-code-md text-error font-bold">{entity.flow}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Flagged Signals */}
               <div className="border-t border-outline-variant/20 pt-4">
                 <h4 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-3">
                   Flagged Signals
@@ -285,10 +331,10 @@ export function FraudRings() {
                   ].map((signal, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 text-body-sm text-on-surface-variant"
+                      className="flex items-center gap-2 text-body-sm text-on-surface-variant bg-error/5 p-2 rounded border border-error/10"
                     >
-                      <span className="w-2 h-2 rounded-full bg-error"></span>
-                      {signal}
+                      <span className="material-symbols-outlined text-error text-[16px]">warning</span>
+                      <span className="text-error font-medium">{signal}</span>
                     </div>
                   ))}
                 </div>

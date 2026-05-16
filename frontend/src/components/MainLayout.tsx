@@ -1,16 +1,18 @@
 import React from 'react';
 
-type View = 'dashboard' | 'ingest' | 'scores' | 'graph' | 'squad';
+type View = 'dashboard' | 'runs' | 'ingest' | 'scores' | 'graph' | 'squad';
 
 interface MainLayoutProps {
   activeView: View;
   setActiveView: (view: View) => void;
+  selectedCycleId?: string | null;
   children: React.ReactNode;
 }
 
-export function MainLayout({ activeView, setActiveView, children }: MainLayoutProps) {
+export function MainLayout({ activeView, setActiveView, selectedCycleId, children }: MainLayoutProps) {
   const navItems: { id: View; label: string; icon: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { id: 'runs', label: 'Audit Runs', icon: 'history' },
     { id: 'ingest', label: 'Upload', icon: 'upload_file' },
     { id: 'scores', label: 'Surveillance', icon: 'security' },
     { id: 'graph', label: 'Fraud Rings', icon: 'hub' },
@@ -24,10 +26,10 @@ export function MainLayout({ activeView, setActiveView, children }: MainLayoutPr
         <div className="flex items-center gap-4">
           <span className="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">AEGIS</span>
           <div className="h-4 w-px bg-outline-variant/50 mx-2 hidden md:block"></div>
-          <span className="font-label-md text-label-md text-on-surface-variant hidden md:flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
-            CYCLE 004 · RUNNING
-          </span>
+            <span className="font-label-md text-label-md text-on-surface-variant hidden md:flex items-center gap-2 uppercase">
+              <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+              {selectedCycleId ? `CYCLE ${selectedCycleId.split('_').pop()}` : 'NO ACTIVE CYCLE'}
+            </span>
         </div>
         
         <div className="flex-1 flex justify-end items-center gap-4">
@@ -67,7 +69,10 @@ export function MainLayout({ activeView, setActiveView, children }: MainLayoutPr
                 <p className="font-body-sm text-body-sm text-on-surface-variant">Gov-Fin Intelligence</p>
               </div>
             </div>
-            <button className="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-label-md text-label-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm">
+            <button 
+              onClick={() => setActiveView('ingest')}
+              className="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-label-md text-label-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
               <span className="material-symbols-outlined text-[18px]">add</span>
               New Scan
             </button>

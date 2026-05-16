@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLatestCycle, subscribeToStream, loadScenario } from '../api';
+import { getLatestCycle, getCycles, subscribeToStream, loadScenario } from '../api';
 
 interface CycleSummary {
   cycle_id: string;
@@ -13,7 +13,7 @@ interface CycleSummary {
   completed_at?: string;
 }
 
-export function Dashboard() {
+export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null }) {
   const [cycle, setCycle] = useState<CycleSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -23,13 +23,20 @@ export function Dashboard() {
   useEffect(() => {
     const loadCycle = async () => {
       try {
-        const latest = await getLatestCycle();
-        if (latest) {
-          setCycle(latest);
+        let activeCycle = null;
+        if (selectedCycleId) {
+          const cycles = await getCycles();
+          activeCycle = cycles.find(c => c.cycle_id === selectedCycleId);
+        } else {
+          activeCycle = await getLatestCycle();
+        }
+        
+        if (activeCycle) {
+          setCycle(activeCycle);
           
           // Subscribe to real-time updates if running
-          if (latest.status === 'RUNNING') {
-            const unsubscribe = subscribeToStream(latest.cycle_id, (message) => {
+          if (activeCycle.status === 'RUNNING') {
+            const unsubscribe = subscribeToStream(activeCycle.cycle_id, (message) => {
               setStreamMessage(message.stage || message.message || '');
               if (message.progress) setProgress(message.progress);
             });
@@ -47,17 +54,13 @@ export function Dashboard() {
     return () => {
       if (unsubscribe instanceof Function) unsubscribe();
     };
-  }, []);
+  }, [selectedCycleId]);
 
   const handleLoadScenario = async (n: number) => {
     setLoadingScenario(true);
     try {
       const result = await loadScenario(n);
-      if (result.cycle_id) {
-        setCycle(result);
-        setProgress(0);
-        setStreamMessage('Scenario loaded, running surveillance...');
-      }
+      setStreamMessage(`Scenario "${result.scenario_name}" loaded — ${result.employees} employees, ${result.vendors} vendors. Go to Upload to run surveillance.`);
     } catch (err) {
       console.error('Failed to load scenario:', err);
     } finally {

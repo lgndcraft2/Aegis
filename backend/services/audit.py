@@ -84,7 +84,10 @@ def get_all_cycles(db: Session) -> list[dict]:
             "total_employees": c.total_employees,
             "total_vendors": c.total_vendors,
             "total_alerts": c.total_alerts,
-            "total_intercepted_amount": c.total_intercepted_amount,
+            "critical_alerts": json.loads(c.result_summary).get("critical_alerts", 0) if c.result_summary else 0,
+            "high_alerts": json.loads(c.result_summary).get("high_alerts", 0) if c.result_summary else 0,
+            "total_intercepted_amount": c.total_intercepted_amount or 0,
+            "intercepted_amount": c.total_intercepted_amount or 0,
         }
         for c in cycles
     ]

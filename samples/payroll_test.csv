@@ -1,0 +1,5 @@
+employee_id,name,department,grade_level,salary_account,bvn,employment_date,has_service_record,absences_ytd
+EMP-001,John Doe,Finance,GL-12,1234567890,BVN-12345678,2020-01-01,True,5
+EMP-002,Jane Smith,Health,GL-09,2345678901,BVN-23456789,2021-03-15,True,2
+EMP-003,Musa Ibrahim,Works,GL-10,3456789012,BVN-34567890,2018-11-20,True,8
+EMP-999,Phantom User,Health,GL-08,9876543210,BVN-99999999,2024-05-01,False,0

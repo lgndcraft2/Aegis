@@ -34,6 +34,11 @@ export async function getSquadAccounts(cycleId: string) {
   return data
 }
 
+export async function releaseTransaction(transactionId: string) {
+  const { data } = await api.post(`/squad/release/${transactionId}`)
+  return data
+}
+
 export async function loadScenario(n: number) {
   const { data } = await api.post(`/demo/load-scenario/${n}`)
   return data
@@ -46,7 +51,7 @@ export async function getCycles() {
 
 export async function getLatestCycle() {
   const cycles = await getCycles()
-  return cycles[cycles.length - 1] || null
+  return cycles[0] || null
 }
 
 export async function getAuditTrail(cycleId: string) {

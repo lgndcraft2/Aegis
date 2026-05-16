@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLatestCycle, getAlerts } from '../api';
+import { getLatestCycle, getCycles, getAlerts } from '../api';
 import type { FraudAlert } from '../types';
 
 interface AlertRow {
@@ -11,7 +11,7 @@ interface AlertRow {
   expanded: boolean;
 }
 
-export function Surveillance({ onNavigate }: { onNavigate?: (view: any) => void }) {
+export function Surveillance({ onNavigate, selectedCycleId }: { onNavigate?: (view: any) => void, selectedCycleId?: string | null }) {
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [cycle, setCycle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -21,10 +21,17 @@ export function Surveillance({ onNavigate }: { onNavigate?: (view: any) => void 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const latest = await getLatestCycle();
-        if (latest) {
-          setCycle(latest);
-          const fetchedAlerts = await getAlerts(latest.cycle_id);
+        let activeCycle = null;
+        if (selectedCycleId) {
+          const cycles = await getCycles();
+          activeCycle = cycles.find(c => c.cycle_id === selectedCycleId);
+        } else {
+          activeCycle = await getLatestCycle();
+        }
+
+        if (activeCycle) {
+          setCycle(activeCycle);
+          const fetchedAlerts = await getAlerts(activeCycle.cycle_id);
           
           const alertRows: AlertRow[] = fetchedAlerts.map((alert: FraudAlert) => ({
             entity_id: alert.entity_id,
@@ -48,7 +55,7 @@ export function Surveillance({ onNavigate }: { onNavigate?: (view: any) => void 
     };
 
     loadData();
-  }, []);
+  }, [selectedCycleId]);
 
   const toggleExpand = (index: number) => {
     setAlerts((prev) =>

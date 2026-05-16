@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLatestCycle, getSquadAccounts } from '../api';
+import { getLatestCycle, getCycles, getSquadAccounts, releaseTransaction } from '../api';
 
 interface Transaction {
   entity_id: string;
@@ -9,7 +9,7 @@ interface Transaction {
   timestamp: string;
 }
 
-export function SquadInterception() {
+export function SquadInterception({ selectedCycleId }: { selectedCycleId?: string | null }) {
   const [cycle, setCycle] = useState<any>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,19 +18,26 @@ export function SquadInterception() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const latest = await getLatestCycle();
-        if (latest) {
-          setCycle(latest);
+        let activeCycle = null;
+        if (selectedCycleId) {
+          const cycles = await getCycles();
+          activeCycle = cycles.find(c => c.cycle_id === selectedCycleId);
+        } else {
+          activeCycle = await getLatestCycle();
+        }
+
+        if (activeCycle) {
+          setCycle(activeCycle);
           
-          const squadData = await getSquadAccounts(latest.cycle_id);
+          const squadData = await getSquadAccounts(activeCycle.cycle_id);
           
           if (squadData && squadData.held_accounts) {
             const realTransactions: Transaction[] = squadData.held_accounts.map((acc: any) => ({
               entity_id: acc.squad_ref || acc.transaction_id,
               amount: acc.amount,
               va_number: acc.va_number,
-              status: 'HELD',
-              timestamp: latest.started_at || new Date().toISOString(),
+              status: acc.status || 'HELD',
+              timestamp: activeCycle.started_at || new Date().toISOString(),
             }));
             setTransactions(realTransactions);
           } else {
@@ -45,12 +52,18 @@ export function SquadInterception() {
     };
 
     loadData();
-  }, []);
+  }, [selectedCycleId]);
 
-  const handleRelease = (index: number) => {
-    const updated = [...transactions];
-    updated[index].status = 'RELEASED';
-    setTransactions(updated);
+  const handleRelease = async (index: number) => {
+    const tx = transactions[index];
+    try {
+      await releaseTransaction(tx.entity_id);
+      const updated = [...transactions];
+      updated[index].status = 'RELEASED';
+      setTransactions(updated);
+    } catch (err) {
+      console.error('Failed to release funds:', err);
+    }
   };
 
   const formatAmount = (amount: number) => {
