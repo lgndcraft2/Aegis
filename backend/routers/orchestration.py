@@ -342,18 +342,23 @@ async def run_pipeline(cycle_id: str, employees: list, vendors: list, source: st
 
         all_alerts = emp_alerts + vnd_alerts + coll_alerts
 
-        # ── Squad Interception ──
+        # ── Squad Interception & Disbursement ──
         await manager.broadcast({"cycle_id": cycle_id, "stage": "Squad Interception", "progress": 95})
         intercepted_amount = 0.0
         held_accounts = []
+        
+        # Track which entities already have an interception record
+        processed_entities = set()
 
+        # 1. Process High/Critical Alerts (INTERCEPT)
         for alert in all_alerts:
             if alert.get("severity") in ["HIGH", "CRITICAL"]:
                 entity_id = alert["entity_id"]
                 entity_type = alert["entity_type"]
+                processed_entities.add(f"{entity_type}_{entity_id}")
+                
                 amt = 250000.0 if entity_type == "EMPLOYEE" else 4500000.0
 
-                # Create a real Squad Virtual Account for the hold
                 va_result = squad_client.create_virtual_account(
                     customer_identifier=f"AEGIS_{cycle_id}_{entity_id}",
                     business_name=f"AEGIS Hold — {entity_id}",
@@ -361,7 +366,6 @@ async def run_pipeline(cycle_id: str, employees: list, vendors: list, source: st
 
                 va_number = va_result.get("data", {}).get("virtual_account_number", "N/A")
 
-                # Create transaction record linked to the VA
                 tx = Transaction(
                     transaction_id=f"TX_{uuid.uuid4().hex[:8].upper()}",
                     type="PAYROLL" if entity_type == "EMPLOYEE" else "PROCUREMENT",
@@ -369,27 +373,44 @@ async def run_pipeline(cycle_id: str, employees: list, vendors: list, source: st
                     status="HELD",
                     cycle_id=cycle_id,
                     aegis_score=0,
-                    verdict="HOLD",
+                    verdict=alert["signal_name"],
                     squad_va_number=va_number,
                     squad_tx_ref=va_result.get("data", {}).get("customer_identifier"),
                 )
                 db.add(tx)
-
-                held_accounts.append({
-                    "entity_id": entity_id,
-                    "entity_type": entity_type,
-                    "amount": amt,
-                    "va_number": va_number,
-                    "squad_response": va_result,
-                })
-
+                held_accounts.append({"entity_id": entity_id, "entity_type": entity_type, "amount": amt, "va_number": va_number})
                 intercepted_amount += amt
 
-                log_event(db, cycle_id, "SQUAD_VA_CREATED", entity_type=entity_type, entity_id=entity_id, details={
-                    "va_number": va_number,
-                    "amount": amt,
-                    "simulated": va_result.get("simulated", False),
-                })
+        # 2. Process Remaining Entities (AUTO-CLEAR)
+        for emp in scored_employees:
+            eid = emp["employee_id"]
+            if f"EMPLOYEE_{eid}" not in processed_entities:
+                tx = Transaction(
+                    transaction_id=f"TX_{uuid.uuid4().hex[:8].upper()}",
+                    type="PAYROLL",
+                    amount=250000.0,
+                    status="RELEASED",
+                    cycle_id=cycle_id,
+                    aegis_score=100,
+                    verdict="CLEARED",
+                    squad_va_number="N/A",
+                )
+                db.add(tx)
+
+        for vnd in scored_vendors:
+            vid = vnd["vendor_id"]
+            if f"VENDOR_{vid}" not in processed_entities:
+                tx = Transaction(
+                    transaction_id=f"TX_{uuid.uuid4().hex[:8].upper()}",
+                    type="PROCUREMENT",
+                    amount=4500000.0,
+                    status="RELEASED",
+                    cycle_id=cycle_id,
+                    aegis_score=100,
+                    verdict="CLEARED",
+                    squad_va_number="N/A",
+                )
+                db.add(tx)
 
         db.commit()
 
@@ -546,6 +567,7 @@ async def get_squad_accounts(cycle_id: str, db: Session = Depends(get_db)):
             "status": tx.status,
             "va_number": tx.squad_va_number,
             "squad_ref": tx.squad_tx_ref,
+            "signal_name": tx.verdict, # Mapping verdict to signal_name for display
         }
         for tx in held_txs
     ]
@@ -563,6 +585,21 @@ async def get_squad_accounts(cycle_id: str, db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────
 #  Demo Scenario Loader
 # ──────────────────────────────────────────────
+
+@router.post("/system/reset")
+async def reset_database(db: Session = Depends(get_db)):
+    """Clear all employee and vendor data for a fresh start."""
+    try:
+        db.query(Employee).delete()
+        db.query(Vendor).delete()
+        # Also clear transactions and cycles if you want a TOTAL reset
+        db.query(Transaction).delete()
+        db.query(SurveillanceCycle).delete()
+        db.commit()
+        return {"success": True, "message": "Database cleared successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/demo/load-scenario/{n}")
 async def load_scenario(n: int, db: Session = Depends(get_db)):
@@ -840,6 +877,26 @@ async def release_squad_transaction(transaction_id: str, db: Session = Depends(g
         log_event(db, tx.cycle_id, "ERROR", entity_id=tx.transaction_id, details={"error": str(squad_err)})
 
     db.commit()
+
+    # Update the Cycle's summary metrics to reflect the release
+    try:
+        cycle = db.query(SurveillanceCycle).filter(SurveillanceCycle.cycle_id == tx.cycle_id).first()
+        if cycle and cycle.result_summary:
+            summary = json.loads(cycle.result_summary)
+            
+            # Recalculate totals for this cycle from the Transaction table
+            all_txs = db.query(Transaction).filter(Transaction.cycle_id == tx.cycle_id).all()
+            total_held = sum(t.amount for t in all_txs if t.status == "HELD")
+            total_released = sum(t.amount for t in all_txs if t.status == "RELEASED")
+            
+            summary["intercepted_amount"] = total_held
+            summary["released_amount"] = total_released
+            summary["held_accounts"] = len([t for t in all_txs if t.status == "HELD"])
+            
+            cycle.result_summary = json.dumps(summary)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update cycle summary after release: {e}")
     
     return {"success": True, "message": "Funds released and Squad transfer initiated", "transaction_id": tx.transaction_id}
 

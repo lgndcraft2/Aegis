@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { CycleResults, FraudAlert, Employee, Vendor } from './types'
 
 const api = axios.create({
-  baseURL: 'https://aegis-be.vercel.app/',
+  baseURL: '/api',
 })
 
 export async function uploadPayroll(file: File) {
@@ -44,6 +44,11 @@ export async function loadScenario(n: number) {
   return data
 }
 
+export async function resetDatabase() {
+  const { data } = await api.post('/system/reset')
+  return data
+}
+
 export async function getCycles() {
   const { data } = await api.get<{ cycles: any[] }>('/cycles')
   return data.cycles
@@ -75,7 +80,8 @@ export async function getVendors() {
 }
 
 export function subscribeToStream(cycleId: string, onMessage: (data: any) => void, onError?: (err: Error) => void) {
-  const ws = new WebSocket(`wss://aegis-be.vercel.app/stream/${cycleId}`)
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const ws = new WebSocket(`${protocol}//${window.location.host}/api/stream/${cycleId}`)
   
   ws.onmessage = (event) => {
     try {

@@ -1,0 +1,9 @@
+employee_id,name,department,grade_level,salary_account,bvn,employment_date,has_service_record,absences_ytd
+EMP_S01,Oluwaseun Adeniyi,Finance,GL-12,0011223344,22334455667,2024-01-15,false,0
+EMP_S02,Chidi Okoro,Finance,GL-08,0011223345,22334455667,2024-02-10,false,0
+EMP_S03,Fatimah Musa,Finance,GL-09,0011223346,22334455667,2024-03-05,false,0
+EMP_LEG_01,Dr. Amina Bello,Health,GL-15,9988776601,55667788991,2010-05-20,true,4
+EMP_LEG_02,Babajide Soyinka,Works,GL-10,9988776602,55667788992,2015-11-12,true,2
+EMP_LEG_03,Kemi Akindele,Education,GL-08,9988776603,55667788993,2020-01-15,true,1
+EMP_LEG_04,Umar Farouk,Finance,GL-12,9988776604,55667788994,2012-08-30,true,5
+EMP_LEG_05,Blessing Okon,Health,GL-09,9988776605,55667788995,2018-03-22,true,3

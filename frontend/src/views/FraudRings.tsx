@@ -31,7 +31,8 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
   const [graphElements, setGraphElements] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadCycle = async () => {
+    const loadData = async () => {
+      setLoading(true);
       try {
         let activeCycle = null;
         if (selectedCycleId) {
@@ -44,13 +45,11 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
         if (activeCycle) {
           setCycle(activeCycle);
 
-          // Fetch real results including the collusion graph
           if (activeCycle.status === 'COMPLETED') {
             const results = await getResults(activeCycle.cycle_id);
             const graph = results.graph || [];
             setGraphElements(graph);
 
-            // Extract rings from graph cluster data
             const clusterMap: Record<string, any[]> = {};
             const orchestrators: Record<string, any> = {};
             for (const el of graph) {
@@ -85,9 +84,27 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
         setLoading(false);
       }
     };
-
-    loadCycle();
+    loadData();
   }, [selectedCycleId]);
+
+  // Stabilize layout: only run COSE when elements change
+  useEffect(() => {
+    if (cyRef && graphElements.length > 0) {
+      const layout = cyRef.layout({
+        name: 'cose',
+        animate: true,
+        animationDuration: 1000,
+        nodeRepulsion: () => 4500,
+        idealEdgeLength: () => 50,
+        gravity: 0.25,
+        randomize: true,
+        componentSpacing: 100,
+        nodeOverlap: 20,
+        refresh: 20,
+      } as any);
+      layout.run();
+    }
+  }, [cyRef, graphElements]);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -419,7 +436,7 @@ export function FraudRings({ selectedCycleId }: { selectedCycleId?: string | nul
                 { selector: 'edge', style: { 'width': 1.5, 'line-color': '#707971', 'target-arrow-color': '#707971', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'opacity': 0.7 } }
               ]}
               style={{ width: '100%', height: '100%' }}
-              layout={{ name: 'cose', animate: true, animationDuration: 500, nodeRepulsion: () => 8000, idealEdgeLength: () => 80, gravity: 0.3 } as any}
+              layout={{ name: 'preset' } as any}
             />
           </div>
           {selectedNode && (

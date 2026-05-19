@@ -7,6 +7,7 @@ interface Transaction {
   va_number: string;
   status: 'HELD' | 'RELEASED' | 'INVESTIGATING';
   timestamp: string;
+  signal_name?: string;
 }
 
 export function SquadInterception({ selectedCycleId }: { selectedCycleId?: string | null }) {
@@ -38,6 +39,7 @@ export function SquadInterception({ selectedCycleId }: { selectedCycleId?: strin
               va_number: acc.va_number,
               status: acc.status || 'HELD',
               timestamp: activeCycle.started_at || new Date().toISOString(),
+              signal_name: acc.signal_name || 'Flagged by AEGIS Engine',
             }));
             setTransactions(realTransactions);
           } else {
@@ -209,6 +211,9 @@ export function SquadInterception({ selectedCycleId }: { selectedCycleId?: strin
                       <td className="px-6 py-4">
                         <p className="font-body-md text-body-md text-on-surface font-semibold">
                           {tx.entity_id}
+                        </p>
+                        <p className="font-label-sm text-label-sm text-error/70">
+                          {tx.signal_name}
                         </p>
                       </td>
                       <td className="px-6 py-4">

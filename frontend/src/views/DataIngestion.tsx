@@ -99,13 +99,33 @@ export function DataIngestion({ onCycleStarted, onNavigate }: { onCycleStarted?:
     <main className="flex-1 md:ml-[220px] p-6 bg-surface-container-low min-h-screen">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="font-headline-lg text-headline-lg text-on-background mb-2">
-            Data Ingestion
-          </h1>
-          <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">
-            Upload government payroll and vendor registers. AEGIS normalizes the data and runs multi-signal analysis across payroll, procurement, and cross-domain collusion networks.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="font-headline-lg text-headline-lg text-on-background mb-2">
+              Data Ingestion
+            </h1>
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">
+              Upload government payroll and vendor registers. AEGIS normalizes the data and runs multi-signal analysis across payroll, procurement, and cross-domain collusion networks.
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              if (window.confirm('Are you sure you want to wipe the database? All historical cycles and data will be lost.')) {
+                try {
+                  const { resetDatabase } = await import('../api');
+                  await resetDatabase();
+                  alert('Database reset successful.');
+                  window.location.reload();
+                } catch (e) {
+                  alert('Reset failed.');
+                }
+              }
+            }}
+            className="px-4 py-2 bg-error/10 text-error border border-error/20 rounded-lg font-label-md text-label-md hover:bg-error/20 transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+            Reset Environment
+          </button>
         </div>
 
         {/* Upload Cards Grid */}

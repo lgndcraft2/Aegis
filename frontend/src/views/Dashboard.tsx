@@ -119,7 +119,7 @@ export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null
         )}
 
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {/* Metric 1: Employees Scanned */}
           <div className="bg-surface rounded-lg border border-outline-variant/30 p-5 flex flex-col">
             <div className="flex items-start justify-between mb-3">
@@ -168,14 +168,28 @@ export function Dashboard({ selectedCycleId }: { selectedCycleId?: string | null
           <div className="bg-surface rounded-lg border border-outline-variant/30 p-5 flex flex-col">
             <div className="flex items-start justify-between mb-3">
               <h3 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-                Intercepted
+                In Hold
               </h3>
-              <span className="material-symbols-outlined text-primary text-[20px]">account_balance_wallet</span>
+              <span className="material-symbols-outlined text-error text-[20px]">lock_clock</span>
             </div>
-            <div className="text-2xl font-bold text-primary mb-1">
+            <div className="text-2xl font-bold text-error mb-1">
               {cycle?.intercepted_amount ? formatAmount(cycle.intercepted_amount) : '₦0'}
             </div>
-            <p className="font-body-sm text-on-surface-variant">In Squad VAs</p>
+            <p className="font-body-sm text-on-surface-variant">Pending Review</p>
+          </div>
+
+          {/* Metric 5: Amount Released */}
+          <div className="bg-surface rounded-lg border border-outline-variant/30 p-5 flex flex-col">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+                Released Today
+              </h3>
+              <span className="material-symbols-outlined text-primary text-[20px]">verified_user</span>
+            </div>
+            <div className="text-2xl font-bold text-primary mb-1">
+              {(cycle as any)?.released_amount ? formatAmount((cycle as any).released_amount) : '₦0'}
+            </div>
+            <p className="font-body-sm text-on-surface-variant">Disbursed to Beneficiaries</p>
           </div>
         </div>
 
